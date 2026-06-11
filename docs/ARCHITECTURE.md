@@ -85,8 +85,10 @@ No password-based auth. No social login (Google, Apple).
 3. Frontend stores tokens in memory (not localStorage — PWA constraint)
    using Supabase client's built-in session management
 4. All FastAPI requests include: Authorization: Bearer {access_token}
-5. FastAPI validates JWT using Supabase JWKS endpoint:
-   https://{project_ref}.supabase.co/auth/v1/.well-known/jwks.json
+5. FastAPI validates JWT using HS256 with the Supabase JWT secret:
+   The decoded payload is checked for ``aud: "authenticated"`` and
+   ``sub`` (user_id). This is the standard Supabase Auth verification
+   pattern — simpler than JWKS and avoids an HTTP request per validation.
 6. Validated token payload provides: sub (user_id), role, aud, exp
 7. user_id extracted from token.sub — never from request body
 ```
@@ -102,7 +104,7 @@ async def get_current_user(
     db: SupabaseClient = Depends(get_db)
 ) -> AuthUser:
     token = credentials.credentials
-    # Validate against Supabase JWKS
+    # Validate JWT (HS256 with Supabase JWT secret)
     payload = verify_supabase_jwt(token)
     user_id = UUID(payload["sub"])
     # Fetch user profile from users table

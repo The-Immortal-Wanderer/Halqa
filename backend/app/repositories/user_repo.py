@@ -1,5 +1,6 @@
 """Data access for the users table."""
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -9,14 +10,20 @@ logger = logging.getLogger(__name__)
 
 
 async def get_by_id(db: Client, user_id: UUID) -> dict | None:
-    """Fetch a user by their UUID. Returns None if not found."""
-    result = (
-        db.table("users")
-        .select("*")
-        .eq("id", str(user_id))
-        .is_("deleted_at", "null")
-        .single()
-        .execute()
+    """Fetch a user by their UUID. Returns None if not found.
+
+    Runs the sync ``.execute()`` in a thread to avoid blocking the event
+    loop, per the ``async/await throughout`` mandate.
+    """
+    result = await asyncio.to_thread(
+        lambda: (
+            db.table("users")
+            .select("*")
+            .eq("id", str(user_id))
+            .is_("deleted_at", "null")
+            .single()
+            .execute()
+        )
     )
     return result.data if result.data else None
 

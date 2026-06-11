@@ -1,5 +1,6 @@
 """Data access for anchor_roles and anchor_actions_log tables."""
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -9,15 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 async def get_active(db: Client, user_id: UUID, neighborhood_id: UUID) -> dict | None:
-    """Get the active anchor role for a user in a neighborhood."""
-    result = (
-        db.table("anchor_roles")
-        .select("*")
-        .eq("user_id", str(user_id))
-        .eq("neighborhood_id", str(neighborhood_id))
-        .eq("is_active", True)
-        .single()
-        .execute()
+    """Get the active anchor role for a user in a neighborhood.
+
+    Runs the sync ``.execute()`` in a thread to avoid blocking the event
+    loop, per the ``async/await throughout`` mandate.
+    """
+    result = await asyncio.to_thread(
+        lambda: (
+            db.table("anchor_roles")
+            .select("*")
+            .eq("user_id", str(user_id))
+            .eq("neighborhood_id", str(neighborhood_id))
+            .eq("is_active", True)
+            .single()
+            .execute()
+        )
     )
     return result.data if result.data else None
 
