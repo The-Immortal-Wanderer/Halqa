@@ -107,7 +107,7 @@ supabase db push
 supabase db reset
 ```
 
-Migrations live in `supabase/migrations/`. Seed data is in `supabase/seed.sql`.
+Migrations live in `supabase/migrations/`. Seed data is embedded in the initial migration file (`20260611_001_initial_schema.sql`).
 
 ---
 

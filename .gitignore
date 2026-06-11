@@ -7,3 +7,4 @@ backend/.env
 backend/venv/
 .DS_Store
 .omo/
+supabase/.temp/

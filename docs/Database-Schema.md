@@ -829,5 +829,4 @@ For the hackathon demo, seed data must include:
   one maid (no badge)
 - **4 worker reviews** to demonstrate the rating system
 
-Seed data lives in `supabase/seed.sql`. Applied via `supabase db reset`
-during local development. Never applied to production.
+Seed data is embedded inline in the initial migration file (`20260611_001_initial_schema.sql`), ensuring records are created when the migration is pushed. Applied via `supabase db push`. Never applied to production separately.

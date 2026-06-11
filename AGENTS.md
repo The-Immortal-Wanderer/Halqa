@@ -386,7 +386,7 @@ status map for any new session.
 | Feature | Status |
 |---|---|
 | Project scaffolding | Complete |
-| Database migrations | Not started |
+| Database migrations | Complete |
 | Authentication (Supabase Auth) | Not started |
 | Onboarding flow | Not started |
 | Verification flow (Tier 1 + Tier 2) | Not started |

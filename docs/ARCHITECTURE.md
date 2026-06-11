@@ -1362,7 +1362,6 @@ halqa/
 │   └── api/          ← FastAPI backend
 ├── supabase/
 │   ├── migrations/
-│   ├── seed.sql
 │   └── config.toml
 └── .env.example
 ```
