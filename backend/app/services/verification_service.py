@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 #     - 0.40 <= confidence < 0.75: flag for manual review
 #     - confidence < 0.40: auto-reject
 #     """
-#     from app.services import classification_service
-#     from app.repositories import verification_repo
-#     signed_url = await storage_service.get_signed_url(doc["storage_path"])
-#     ocr_result = await classification_service.extract_address(signed_url, declared_address)
+    #     from app.services import ocr_service
+    #     from app.repositories import verification_repo
+    #     signed_url = await storage_service.get_signed_url(doc["storage_path"])
+    #     ocr_result = await ocr_service.extract_address(signed_url, declared_address)
 #     if ocr_result["confidence"] >= 0.75:
 #         await verification_repo.set_status(db, record["id"], "approved")
 #         # Trigger document deletion
