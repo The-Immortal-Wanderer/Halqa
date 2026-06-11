@@ -8,11 +8,14 @@ The sync client is returned here; repo functions use
 event loop, per the ``async/await throughout`` mandate in AGENTS.md.
 """
 
+from functools import lru_cache
+
 from supabase import Client, create_client
 
 from app.core.config import get_settings
 
 
+@lru_cache()
 def get_supabase_client() -> Client:
     """Return a cached Supabase admin client using the service role key."""
     settings = get_settings()

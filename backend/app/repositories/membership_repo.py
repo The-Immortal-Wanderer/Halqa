@@ -1,4 +1,4 @@
-"""Data access for neighborhood_memberships table."""
+"""Data access for neighborhood_members table."""
 
 import asyncio
 import logging
@@ -17,7 +17,7 @@ async def get_active(db: Client, user_id: UUID, neighborhood_id: UUID) -> dict |
     """
     result = await asyncio.to_thread(
         lambda: (
-            db.table("neighborhood_memberships")
+            db.table("neighborhood_members")
             .select("*")
             .eq("user_id", str(user_id))
             .eq("neighborhood_id", str(neighborhood_id))
