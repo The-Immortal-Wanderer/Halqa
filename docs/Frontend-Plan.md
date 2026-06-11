@@ -16,7 +16,7 @@ references it by name throughout.
 ## 1. Project Structure
 
 ```
-apps/web/
+frontend/
 ├── app/                              ← Next.js App Router root
 │   ├── layout.tsx                    ← Root layout: fonts, global styles, auth provider
 │   ├── page.tsx                      ← Root route → redirects to /onboarding or /neighborhood

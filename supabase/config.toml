@@ -1,0 +1,21 @@
+# Supabase CLI configuration for Halqa
+# Reference: https://supabase.com/docs/reference/cli/config
+
+project_id = "halqa"
+plan = "free"
+
+[auth]
+enabled = true
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[storage]
+enabled = true
+
+[analytics]
+enabled = false

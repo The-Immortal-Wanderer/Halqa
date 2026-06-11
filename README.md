@@ -73,7 +73,7 @@ The API server starts at `http://localhost:8000`. Interactive docs at `http://lo
 
 ```bash
 curl http://localhost:8000/health
-# → {"data":{"status":"ok"},"error":null}
+# → {"data":{"status":"ok","environment":"development"},"error":null}
 ```
 
 ### Environment Variables (backend/.env)

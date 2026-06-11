@@ -14,7 +14,7 @@ table definitions, constraints, and RLS policies before any repository work.
 ## 1. Project Structure
 
 ```
-apps/api/
+backend/
 ├── app/
 │   ├── main.py                    ← FastAPI app factory, CORS, routers mounted
 │   ├── core/

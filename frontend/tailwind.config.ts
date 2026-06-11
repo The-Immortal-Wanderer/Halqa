@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./hooks/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
 
   theme: {
     extend: {
@@ -43,8 +43,8 @@ const config: Config = {
       },
 
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        urdu: ["Noto Nastaliq Urdu", "serif"],
+        sans: ["var(--font-plus-jakarta-sans)", "system-ui", "sans-serif"],
+        urdu: ["var(--font-noto-nastaliq-urdu)", "serif"],
       },
 
       borderRadius: {
