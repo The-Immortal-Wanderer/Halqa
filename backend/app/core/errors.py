@@ -1,0 +1,75 @@
+"""Standard error codes and HTTPException helper.
+
+Every error code used across the application must be added to ErrorCode first.
+Never use ad-hoc error strings in routers or services.
+"""
+
+from fastapi import HTTPException
+
+
+class ErrorCode:
+    """All error codes used across the application."""
+
+    # Auth
+    UNAUTHORIZED = "UNAUTHORIZED"
+    FORBIDDEN = "FORBIDDEN"
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"
+
+    # User
+    USER_NOT_FOUND = "USER_NOT_FOUND"
+    USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS"
+    DISPLAY_NAME_TOO_SHORT = "DISPLAY_NAME_TOO_SHORT"
+
+    # Neighborhood
+    NEIGHBORHOOD_NOT_FOUND = "NEIGHBORHOOD_NOT_FOUND"
+    NEIGHBORHOOD_SEARCH_REQUIRED = "NEIGHBORHOOD_SEARCH_REQUIRED"
+
+    # Membership
+    ALREADY_A_MEMBER = "ALREADY_A_MEMBER"
+    NOT_A_MEMBER = "NOT_A_MEMBER"
+    TIER_INSUFFICIENT = "TIER_INSUFFICIENT"
+    ONE_NEIGHBORHOOD_LIMIT = "ONE_NEIGHBORHOOD_LIMIT"
+
+    # Verification
+    VERIFICATION_PENDING = "VERIFICATION_PENDING"
+    VERIFICATION_ALREADY_APPROVED = "VERIFICATION_ALREADY_APPROVED"
+    VERIFICATION_NOT_FOUND = "VERIFICATION_NOT_FOUND"
+    DOCUMENT_TOO_LARGE = "DOCUMENT_TOO_LARGE"
+    DOCUMENT_TYPE_INVALID = "DOCUMENT_TYPE_INVALID"
+    OCR_FAILED = "OCR_FAILED"
+
+    # Posts
+    POST_NOT_FOUND = "POST_NOT_FOUND"
+    POST_AUTHOR_REQUIRED = "POST_AUTHOR_REQUIRED"
+    ALREADY_RESOLVED = "ALREADY_RESOLVED"
+    RESOLVE_PERMISSION_DENIED = "RESOLVE_PERMISSION_DENIED"
+    CONTENT_TOO_LONG = "CONTENT_TOO_LONG"
+
+    # Anchor
+    NOT_ANCHOR = "NOT_ANCHOR"
+    ANCHOR_CANNOT_SELF_VOUCH = "ANCHOR_CANNOT_SELF_VOUCH"
+    VOUCHING_REQUIRES_TWO_SIGNERS = "VOUCHING_REQUIRES_TWO_SIGNERS"
+    ANCHOR_TERM_EXPIRED = "ANCHOR_TERM_EXPIRED"
+
+    # Worker
+    WORKER_NOT_FOUND = "WORKER_NOT_FOUND"
+    JOB_NOT_CONFIRMED = "JOB_NOT_CONFIRMED"
+    REVIEW_ALREADY_EXISTS = "REVIEW_ALREADY_EXISTS"
+
+    # Rate limit
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+
+    # Internal
+    INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+
+
+def api_error(status_code: int, code: str, message: str) -> HTTPException:
+    """Return a consistently-shaped HTTPException.
+
+    Every endpoint error uses this helper to ensure the response envelope
+    follows the standard ``{"data": null, "error": {"code": ..., "message": ...}}`` shape.
+    """
+    return HTTPException(
+        status_code=status_code,
+        detail={"code": code, "message": message},
+    )

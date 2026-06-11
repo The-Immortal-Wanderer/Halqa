@@ -1,0 +1,14 @@
+{
+  "name": "Halqa — Your neighborhood, organized.",
+  "short_name": "Halqa",
+  "description": "A verified community platform for Pakistani neighborhoods.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4EE",
+  "theme_color": "#1D6A58",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

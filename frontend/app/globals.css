@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Google Fonts Import ─────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+/* ─── Custom CSS Properties ────────────────────────────────── */
+
+:root {
+  --color-teal: #1d6a58;
+  --color-teal-light: #e6f4f0;
+  --color-teal-dark: #0f4a3c;
+  --color-sand: #f7f4ee;
+  --color-sand-mid: #ede9df;
+  --color-sand-dark: #c9c3b4;
+  --color-amber: #c97a1b;
+  --color-amber-light: #fdf3e3;
+  --color-amber-dark: #8a5210;
+  --color-ink: #1e1c18;
+  --color-ink-mid: #5c574e;
+  --color-ink-light: #9c9589;
+  --color-success: #2e7d5c;
+  --color-success-bg: #ebf6f1;
+  --color-danger: #b84040;
+  --color-danger-bg: #faeaea;
+}
+
+/* ─── Keyframes ────────────────────────────────────────────── */
+
+@keyframes halqa-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes halqa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Reduced Motion ───────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
