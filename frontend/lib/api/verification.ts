@@ -1,9 +1,22 @@
 import { apiUpload, apiFetch } from "@/lib/api/client";
-import type { VerificationRecord } from "@/types";
+import type {
+  VerificationSubmitResponse,
+  VerificationStatusData,
+  UpgradeTierResponse,
+} from "@/types";
 
 export const verificationApi = {
   submitDocument: (formData: FormData) =>
-    apiUpload<VerificationRecord>("/verification/documents", formData),
+    apiUpload<VerificationSubmitResponse>(
+      "/api/v1/verification/submit",
+      formData,
+    ),
 
-  getStatus: () => apiFetch<VerificationRecord>("/verification/status"),
+  getStatus: () =>
+    apiFetch<VerificationStatusData>("/api/v1/verification/status"),
+
+  upgradeTier: () =>
+    apiFetch<UpgradeTierResponse>("/api/v1/verification/upgrade-tier", {
+      method: "PATCH",
+    }),
 };

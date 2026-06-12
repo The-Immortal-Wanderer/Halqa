@@ -2,13 +2,18 @@
 
 All protected endpoints use the dependency functions defined here.
 The user_id is always extracted from the validated JWT — never from the request body.
+
+Supabase Auth issues ES256-signed JWTs. Tokens are verified by calling the
+GoTrue ``/auth/v1/user`` endpoint rather than decoding locally. This avoids
+the complexity of JWKS key rotation and works regardless of the signing
+algorithm (HS256 vs ES256).
 """
 
 from uuid import UUID
 
+import httpx
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 
 from app.core.config import get_settings
 from app.core.errors import ErrorCode, api_error
@@ -19,23 +24,26 @@ from app.schemas.common import AuthAnchor, AuthMember, AuthUser
 security = HTTPBearer()
 
 
-def verify_supabase_jwt(token: str) -> dict:
-    """Validate a Supabase JWT and return the decoded payload.
+async def verify_supabase_jwt(token: str) -> dict:
+    """Validate a Supabase JWT via the GoTrue user endpoint.
 
-    Uses HS256 with the configured JWT secret. The ``aud`` claim must be
-    ``"authenticated"`` — this is what Supabase Auth sets on issued tokens.
+    Calls ``GET /auth/v1/user`` with the Bearer token. This is the most
+    reliable verification method — it works regardless of signing algorithm
+    (HS256 or ES256) and avoids manual JWKS key management.
     """
     settings = get_settings()
-    try:
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": settings.supabase_anon_key,
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{settings.supabase_url}/auth/v1/user",
+            headers=headers,
         )
-        return payload
-    except JWTError:
+    if resp.status_code != 200:
         raise api_error(401, ErrorCode.UNAUTHORIZED, "Invalid or expired token")
+    return resp.json()
 
 
 async def get_current_user(
@@ -44,16 +52,16 @@ async def get_current_user(
 ) -> AuthUser:
     """Extract the authenticated user from the Bearer token.
 
-    Verifies the JWT, looks up the user in the database, and returns an
-    ``AuthUser`` dataclass. Raises 401 if the token is invalid or the user
-    has been soft-deleted.
+    Verifies the JWT via GoTrue, looks up the user in the database, and
+    returns an ``AuthUser`` dataclass. Raises 401 if the token is invalid
+    or the user has been soft-deleted / doesn't exist.
     """
-    payload = verify_supabase_jwt(credentials.credentials)
-    user_id = UUID(payload["sub"])
+    user_data = await verify_supabase_jwt(credentials.credentials)
+    user_id = UUID(user_data["id"])
     user = await user_repo.get_by_id(db, user_id)
-    if not user or getattr(user, "deleted_at", None):
+    if not user:
         raise api_error(401, ErrorCode.UNAUTHORIZED, "User account not found")
-    return AuthUser(id=user_id, display_name=user.display_name)
+    return AuthUser(id=user_id, display_name=user["display_name"])
 
 
 async def get_current_member(

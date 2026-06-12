@@ -263,8 +263,8 @@ what to do next. Never expose API error codes or stack traces to the user.
   for administrative operations only — it is never exposed to the frontend
   or used in user-facing queries.
 - JWT tokens from Supabase Auth are validated on every authenticated FastAPI
-  endpoint using the JWKS endpoint. No endpoint trusts a user_id from the
-  request body — always extract from the validated token.
+  endpoint via the GoTrue ``/auth/v1/user`` endpoint. No endpoint trusts a
+  user_id from the request body — always extract from the validated token.
 - Verification documents uploaded to Supabase Storage are stored in a
   private bucket. Signed URLs are generated server-side and expire in 1
   hour. No public bucket for verification documents.
@@ -387,14 +387,14 @@ status map for any new session.
 |---|---|
 | Project scaffolding | Complete |
 | Database migrations | Complete |
-| Authentication (Supabase Auth) | Not started |
-| Onboarding flow | Not started |
-| Verification flow (Tier 1 + Tier 2) | Not started |
+| Authentication (Supabase Auth) | Complete |
+| Onboarding flow | Complete |
+| Verification flow (Tier 1 + Tier 2) | Complete |
 | Neighborhood feed (Realtime) | Not started |
 | AI alert classification | Not started |
 | Civic dashboard | Not started |
 | Anchor role + moderation tools | Not started |
 | Worker directory (listings only) | Not started |
 | PWA configuration | Not started |
-| Deep-link handler (verification notifications) | Not started |
+| Deep-link handler (verification notifications) | Complete |
 | Vercel + Render deployment | Not started |

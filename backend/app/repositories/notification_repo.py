@@ -58,3 +58,44 @@ logger = logging.getLogger(__name__)
 # async def delete_subscription(db: Client, subscription_id: UUID) -> None:
 #     """Remove a push subscription (called when expired or user opts out)."""
 #     db.table("push_subscriptions").delete().eq("id", str(subscription_id)).execute()
+
+
+import asyncio
+from uuid import UUID
+
+async def create_notification(
+    db,
+    user_id: UUID,
+    notification_type: str,
+    title: str,
+    body: str,
+    data: dict | None = None,
+    neighborhood_id: UUID | None = None,
+) -> dict:
+    """Create a notification record in the notifications table.
+
+    Simulates push notification delivery via Supabase Realtime (the
+    notifications table has Realtime enabled, so connected clients receive
+    the new row instantly).
+    """
+
+    def _insert():
+        from supabase import create_client
+        from app.core.config import get_settings
+        settings = get_settings()
+        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        result = (
+            client.table("notifications")
+            .insert({
+                "user_id": str(user_id),
+                "type": notification_type,
+                "title": title,
+                "body": body,
+                "data": data or {},
+                "neighborhood_id": str(neighborhood_id) if neighborhood_id else None,
+            })
+            .execute()
+        )
+        return result.data[0]
+
+    return await asyncio.to_thread(_insert)

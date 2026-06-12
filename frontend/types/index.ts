@@ -235,6 +235,22 @@ export interface CoSignTier3Request {
   vouching_request_id: string;
 }
 
+// ─── Verification Flow ───────────────────────────────────────
+
+export interface VerificationSubmitResponse {
+  verification_record_id: string;
+  status: VerificationStatus;
+}
+
+export interface VerificationStatusData {
+  status: VerificationStatus;
+  rejection_reason: RejectionReason | null;
+}
+
+export interface UpgradeTierResponse {
+  tier: "tier_2";
+}
+
 // ─── API Response Envelope ───────────────────────────────────
 
 export interface ApiResponse<T> {

@@ -1,11 +1,12 @@
-"""Supabase client singleton.
+"""Supabase clients.
 
-Uses the service role key to bypass RLS. This client is never exposed to
-the frontend — all authorization is handled in the FastAPI service layer.
-
-The sync client is returned here; repo functions use
-``asyncio.to_thread(client.table(...).execute)`` to avoid blocking the
-event loop, per the ``async/await throughout`` mandate in AGENTS.md.
+Two variants:
+  - ``get_supabase_client()`` — LRU-cached, for use from the main async
+    thread (e.g. FastAPI endpoint dependencies).  **Not** safe to call
+    from thread-pool workers spawned by ``asyncio.to_thread``.
+  - ``new_thread_safe_client()`` — fresh client every call, for use
+    inside ``asyncio.to_thread`` callbacks.  Avoids sharing the cached
+    client's HTTPX session across thread-pool boundaries.
 """
 
 from functools import lru_cache
@@ -17,7 +18,16 @@ from app.core.config import get_settings
 
 @lru_cache()
 def get_supabase_client() -> Client:
-    """Return a cached Supabase admin client using the service role key."""
+    """Return a cached Supabase admin client (main-thread use only)."""
+    settings = get_settings()
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_service_role_key,
+    )
+
+
+def new_thread_safe_client() -> Client:
+    """Return a fresh Supabase admin client for thread-pool use."""
     settings = get_settings()
     return create_client(
         settings.supabase_url,

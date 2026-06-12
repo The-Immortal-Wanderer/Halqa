@@ -9,7 +9,7 @@ uvicorn[standard]>=0.29.0
 supabase>=2.5.0
 
 # Validation and configuration
-pydantic>=2.7.0
+pydantic[email]>=2.7.0
 pydantic-settings>=2.2.0
 python-multipart>=0.0.9
 

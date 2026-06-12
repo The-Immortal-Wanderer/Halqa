@@ -3,21 +3,24 @@
 import logging
 from uuid import UUID
 
+from supabase import Client
+
+from app.repositories import user_repo
+
 logger = logging.getLogger(__name__)
 
 
-# async def get_user_profile(db, user_id: UUID) -> dict:
-#     """Get the authenticated user's profile."""
-#     from app.repositories import user_repo
-#     user = await user_repo.get_by_id(db, user_id)
-#     if not user:
-#         raise ...
-#     return user
+async def get_or_create_user_profile(
+    db: Client,
+    auth_uid: UUID,
+    display_name: str,
+) -> dict:
+    """Return the user profile for *auth_uid*, creating it if it doesn't exist.
 
-
-# async def update_display_name(db, user_id: UUID, new_name: str) -> dict:
-#     """Update display_name with validation."""
-#     from app.repositories import user_repo
-#     if len(new_name) < 2:
-#         raise ...
-#     return await user_repo.update_display_name(db, user_id, new_name)
+    Called by the auth router after a Supabase Auth user is created via the
+    admin API.  Delegates all database access to ``user_repo``.
+    """
+    existing = await user_repo.get_by_id(db, auth_uid)
+    if existing:
+        return existing
+    return await user_repo.create(db, auth_uid, display_name)

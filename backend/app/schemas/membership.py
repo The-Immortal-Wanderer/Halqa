@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import APIResponse
 from app.schemas.neighborhood import NeighborhoodResponse
@@ -31,7 +31,25 @@ class MembershipDetail(BaseModel):
     verification_status: Optional[str] = None  # pending | approved | rejected | expired | null
 
 
+class MembershipJoinRequest(BaseModel):
+    """Request body for joining a neighborhood."""
+
+    neighborhood_id: UUID
+    tier: Literal["tier_1", "tier_2", "tier_3"] = "tier_1"
+    declared_address: str = Field(default="", max_length=500)
+
+
+class JoinResponse(BaseModel):
+    """Response after joining a neighborhood."""
+
+    membership_id: UUID
+    neighborhood_id: UUID
+    tier: int
+    onboarding_complete: bool
+
+
 # Type aliases
 MembershipAPIResponse = APIResponse[NeighborhoodMembershipResponse]
 MembershipDetailAPIResponse = APIResponse[MembershipDetail]
 MemberListAPIResponse = APIResponse[list[dict]]  # Flexible — refined when typed
+JoinAPIResponse = APIResponse[JoinResponse]

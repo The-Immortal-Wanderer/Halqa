@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { verificationApi } from "@/lib/api/verification";
-import type { VerificationRecord } from "@/types";
+import type { VerificationStatusData, VerificationSubmitResponse } from "@/types";
 
 export function useVerification() {
-  const [record, setRecord] = useState<VerificationRecord | null>(null);
+  const [statusData, setStatusData] = useState<VerificationStatusData | null>(null);
+  const [lastSubmit, setLastSubmit] = useState<VerificationSubmitResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStatus = async () => {
       const { data } = await verificationApi.getStatus();
-      if (data) setRecord(data);
+      if (data) setStatusData(data);
       setLoading(false);
     };
 
@@ -20,9 +21,9 @@ export function useVerification() {
 
   const submitDocument = async (formData: FormData) => {
     const { data, error } = await verificationApi.submitDocument(formData);
-    if (data) setRecord(data);
+    if (data) setLastSubmit(data);
     return { data, error };
   };
 
-  return { record, loading, submitDocument };
+  return { statusData, lastSubmit, loading, submitDocument };
 }

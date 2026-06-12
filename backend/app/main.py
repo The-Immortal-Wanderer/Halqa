@@ -15,6 +15,7 @@ from app.core.logging import configure_logging
 from app.routers import (
     alerts,
     anchor,
+    auth,
     dashboard,
     health,
     internal,
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api/v1")
     app.include_router(workers.router, prefix="/api/v1")
     app.include_router(anchor.router, prefix="/api/v1")
+    app.include_router(auth.router, prefix="/api/v1")
     app.include_router(internal.router, prefix="/internal")
 
     logger.info("Halqa API application created (environment=%s)", settings.environment)

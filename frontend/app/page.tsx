@@ -1,15 +1,26 @@
-export default function RootPage() {
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+export default async function RootPage() {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-halqa-sand px-4">
+        <p className="text-sm text-halqa-ink-mid">Redirecting...</p>
+        <meta httpEquiv="refresh" content={`0;url=/neighborhoods`} />
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-halqa-sand px-4">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-halqa-teal">Halqa</h1>
-        <p className="mt-4 text-halqa-ink-mid max-w-md">
-          Your neighborhood, organized. / آپ کا حلقہ، منظم۔
-        </p>
-        <p className="mt-2 text-sm text-halqa-ink-light">
-          A verified community platform for Pakistani neighborhoods.
-        </p>
-      </div>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-halqa-sand px-4">
+      <p className="text-sm text-halqa-ink-mid">Redirecting...</p>
+      <meta httpEquiv="refresh" content={`0;url=/onboarding`} />
     </main>
   );
 }

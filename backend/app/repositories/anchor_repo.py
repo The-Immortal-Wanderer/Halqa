@@ -22,11 +22,11 @@ async def get_active(db: Client, user_id: UUID, neighborhood_id: UUID) -> dict |
             .eq("user_id", str(user_id))
             .eq("neighborhood_id", str(neighborhood_id))
             .eq("is_active", True)
-            .single()
+            .maybe_single()
             .execute()
         )
     )
-    return result.data if result.data else None
+    return result.data if result else None
 
 
 async def is_active_anchor(db: Client, user_id: UUID, neighborhood_id: UUID) -> bool:
