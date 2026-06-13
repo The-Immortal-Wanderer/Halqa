@@ -8,3 +8,14 @@ backend/venv/
 .DS_Store
 .omo/
 supabase/.temp/
+
+# Runtime artifacts
+*.log
+*_pid.txt
+tsconfig.tsbuildinfo
+.playwright-mcp/
+backend/server_*.log
+backend/uvi_*.log
+
+# Temp debug scripts
+backend/scripts/

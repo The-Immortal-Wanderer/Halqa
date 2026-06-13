@@ -9,6 +9,7 @@ interface FeedListProps {
   posts: Post[];
   onPostTap?: (post: Post) => void;
   loading?: boolean;
+  neighborhoodId?: string;
 }
 
 function SkeletonCard() {
@@ -34,6 +35,7 @@ export function FeedList({
   posts,
   onPostTap,
   loading = false,
+  neighborhoodId,
 }: FeedListProps) {
   if (loading && posts.length === 0) {
     return (
@@ -62,6 +64,7 @@ export function FeedList({
           key={post.id}
           post={post}
           onTap={onPostTap ? () => onPostTap(post) : undefined}
+          neighborhoodId={neighborhoodId}
         />
       ))}
     </div>

@@ -10,7 +10,7 @@ import logging
 from uuid import UUID
 
 from app.core.errors import ErrorCode, api_error
-from app.repositories import post_repo
+from app.repositories import dashboard_repo, post_repo
 from app.schemas.post import PostResponse, PostListResponse
 from app.schemas.common import AuthMember
 
@@ -67,6 +67,9 @@ async def create_post(
     post = await post_repo.create_post(
         db, neighborhood_id, UUID(author_member_id), body, category, is_emergency,
     )
+
+    # Invalidate dashboard snapshots — they will be recomputed on next load
+    await dashboard_repo.invalidate_snapshots(db, neighborhood_id)
 
     # Fire-and-forget classification
     asyncio.create_task(

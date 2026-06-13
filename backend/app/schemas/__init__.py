@@ -29,7 +29,18 @@ from app.schemas.verification import (
 from app.schemas.post import PostResponse, PostCreate, PostListResponse, ClassificationResult
 from app.schemas.dashboard import DashboardResponse, DashboardExportResponse
 from app.schemas.worker import WorkerListingResponse, WorkerListingCreate, WorkerReviewResponse, WorkerReviewCreate, WorkerListResponse
-from app.schemas.anchor import AnchorQueueResponse, AnchorActionLogEntry, ClassificationOverride, AnchorPostRemoval
+from app.schemas.anchor import (
+    AnchorStatus,
+    ModerationItem,
+    VouchingRequestItem,
+    VouchingRequestCreated,
+    EscalationItem,
+    AuditEntry,
+    ReportCreated,
+    ReportPostRequest,
+    InitiateVouchingRequest,
+    PostRemoveRequest,
+)
 
 __all__ = [
     "APIResponse",
@@ -47,5 +58,8 @@ __all__ = [
     "DashboardResponse", "DashboardExportResponse",
     "WorkerListingResponse", "WorkerListingCreate", "WorkerReviewResponse",
     "WorkerReviewCreate", "WorkerListResponse",
-    "AnchorQueueResponse", "AnchorActionLogEntry", "ClassificationOverride", "AnchorPostRemoval",
+    "AnchorStatus", "ModerationItem", "VouchingRequestItem",
+    "VouchingRequestCreated", "EscalationItem", "AuditEntry",
+    "ReportCreated", "ReportPostRequest", "InitiateVouchingRequest",
+    "PostRemoveRequest",
 ]

@@ -77,7 +77,8 @@ async def get_current_member(
     membership = await membership_repo.get_active(db, current_user.id, neighborhood_id)
     if not membership:
         raise api_error(403, ErrorCode.NOT_A_MEMBER, "You are not a member of this neighborhood")
-    return AuthMember(user=current_user, membership=membership, tier=getattr(membership, "tier", 1))
+    tier_int = {"tier_1": 1, "tier_2": 2, "tier_3": 3}.get(str(membership.get("tier", "tier_1")), 1)
+    return AuthMember(user=current_user, membership=membership, tier=tier_int)
 
 
 def require_tier(min_tier: int):

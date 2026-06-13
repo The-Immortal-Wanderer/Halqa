@@ -48,9 +48,10 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- for text search on neighborhoods
 users
   └─< neighborhood_members >─ neighborhoods
                                     └─< posts
-                                    |     └─< post_flags
+                                    |     └─< post_reports
                                     └─< anchor_roles
                                     |     └─< anchor_actions_log
+                                    |     └─< post_reports (anchor resolution)
                                     └─< civic_dashboard_snapshots
                                     └─< worker_listings
                                           └─< worker_reviews
@@ -60,9 +61,9 @@ users
         └─ verification_documents (storage reference)
 
 neighborhood_members (Tier 3 vouching)
-  └─< tier3_vouching_requests
-        └─ [anchor co-sign]
-        └─ [second member co-sign]
+  └─< vouching_requests
+        └─ [anchor initiates + signs]
+        └─ [second member co-signs]
 ```
 
 ---
@@ -332,16 +333,14 @@ moderation capacity. Append-only — no updates, no deletes, ever.
 | `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
 | `anchor_role_id` | `UUID` | NO | — | FK to `anchor_roles.id`. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. Denormalized for query performance. |
-| `action_type` | `TEXT` | NO | — | Enum: `post_removed`, `post_classification_overridden`, `tier3_vouched`, `tier3_cosigned`, `member_flagged`, `escalation_reviewed`. |
-| `target_type` | `TEXT` | NO | — | Enum: `post`, `user`, `verification_request`. |
-| `target_id` | `UUID` | NO | — | ID of the post, user, or verification request acted upon. |
-| `reason` | `TEXT` | YES | NULL | Anchor-supplied reason for the action. Optional but encouraged. |
-| `metadata` | `JSONB` | YES | NULL | Additional context (e.g. previous classification value before override). |
+| `action_type` | `anchor_action_type` | NO | — | ENUM: `post_removed`, `post_pinned`, `post_unpinned`, `member_flagged`, `escalation_created`, `vouching_initiated`, `vouching_completed`, `vouching_rejected`, `dismiss_report`. |
+| `target_post_id` | `UUID` | YES | NULL | FK to `posts.id`. Populated when action targets a post. |
+| `target_member_id` | `UUID` | YES | NULL | FK to `neighborhood_members.id`. Populated when action targets a member. |
+| `metadata` | `JSONB` | YES | NULL | Additional context (e.g. removal reason, report resolution). |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | Immutable timestamp. |
 
 **Constraints:**
-- `CHECK (action_type IN ('post_removed', 'post_classification_overridden', 'tier3_vouched', 'tier3_cosigned', 'member_flagged', 'escalation_reviewed'))`
-- `CHECK (target_type IN ('post', 'user', 'verification_request'))`
+- `action_type` references the `anchor_action_type` ENUM — no CHECK constraint needed.
 - No UPDATE or DELETE permitted — enforced via RLS and application layer.
 
 **Indexes:**
@@ -418,36 +417,45 @@ alerts are posts with `ai_classification = 'emergency'` or
 
 ---
 
-### 2.9 `post_flags`
+### 2.9 `post_reports`
 
-**Purpose:** Tracks member flags on posts and anchor moderation actions.
-Also used to count escalation flags for the 20% anchor override threshold.
+**Purpose:** Tracks member-initiated reports against posts for the anchor
+moderation queue. Unlike moderation_escalations (which tracks disputes
+against anchor actions for the 20% threshold), post_reports is the "inbox"
+of content the anchor must review. A Tier 2+ member can report a post they
+find concerning; the community anchor reviews and either removes the post
+or dismisses the report.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
 | `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `post_id` | `UUID` | NO | — | FK to `posts.id`. |
-| `flagged_by` | `UUID` | NO | — | FK to `users.id`. |
-| `membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
-| `flag_type` | `TEXT` | NO | — | Enum: `content_violation`, `false_emergency`, `exclusionary_content`, `anchor_action_dispute`. |
-| `description` | `TEXT` | YES | NULL | Optional additional context. Max 300 chars. |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
+| `post_id` | `UUID` | NO | — | FK to `posts.id`. The reported post. |
+| `reporter_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. Who reported it. |
+| `reason` | `TEXT` | NO | — | Free-text reason. Max 300 chars (CHECK constraint). |
+| `status` | `TEXT` | NO | `'open'` | Enum: `open` (awaiting review), `resolved` (post removed), `dismissed` (no action needed). |
+| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | When the anchor actioned this report. |
+| `resolved_by_action` | `TEXT` | YES | NULL | `removed` or `dismissed` — mirrors the status. |
+| `resolved_by_anchor_role_id` | `UUID` | YES | NULL | FK to `anchor_roles.id`. Which anchor actioned it. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | When the report was filed. |
 
 **Constraints:**
-- `UNIQUE (post_id, flagged_by)` — one flag per user per post.
-- `CHECK (flag_type IN ('content_violation', 'false_emergency', 'exclusionary_content', 'anchor_action_dispute'))`
+- `UNIQUE (post_id, reporter_member_id) WHERE status = 'open'`
+  — one open report per member per post (prevents spam-flooding).
+- `CHECK (char_length(reason) >= 1 AND char_length(reason) <= 300)`
+- `CHECK (status IN ('open', 'resolved', 'dismissed'))`
+- `CHECK (resolved_by_action IS NULL OR resolved_by_action IN ('removed', 'dismissed'))`
 
 **Indexes:**
-- `idx_pf_post_id` on `(post_id)` — count flags per post.
-- `idx_pf_flagged_by` on `(flagged_by)`
+- `idx_pr_post_id` on `(post_id)` — used by anchor to list reports per post.
+- `idx_pr_reporter` on `(reporter_member_id)`
+- `idx_pr_status` on `(status)` where `status = 'open'` — anchor's moderation queue.
 
 **RLS Policies:**
-- `SELECT`: Users can see their own flags. Anchors can see all flags for
-  their neighborhood's posts. Service role sees all.
-- `INSERT`: Tier 2+ members can flag. One flag per post per user (unique
-  constraint enforced).
-- `UPDATE`: Not permitted.
-- `DELETE`: Not permitted.
+- `SELECT`: Reporting member can read their own reports. The neighborhood
+  anchor can read all open reports for their neighborhood's posts.
+- `INSERT`: Tier 2+ members can insert. Verifies reporter belongs to
+  authenticated user with tier >= tier_2 in the post's neighborhood.
+- `UPDATE`: Only the anchor can update a report (resolve or dismiss).
 
 ---
 

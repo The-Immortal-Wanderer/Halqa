@@ -1,50 +1,111 @@
-"""Anchor moderation request/response schemas."""
+"""Pydantic schemas for the Anchor role & moderation feature."""
 
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.schemas.common import APIResponse
-from app.schemas.post import PostResponse
-from app.schemas.verification import Tier3VouchingRequest
+
+# ── Request schemas ─────────────────────────────────────────────────────────
+
+class ReportPostRequest(BaseModel):
+    """Schema for a member reporting a post."""
+    reason: str = Field(..., min_length=1, max_length=300)
 
 
-class AnchorQueueResponse(BaseModel):
-    """Anchor's moderation dashboard data."""
-
-    pending_vouch_requests: list[Tier3VouchingRequest] = []
-    flagged_posts: list[PostResponse] = []
-    total_pending: int = 0
+class InitiateVouchingRequest(BaseModel):
+    """Schema for an anchor initiating a vouching request."""
+    candidate_member_id: UUID
 
 
-class AnchorActionLogEntry(BaseModel):
-    """A single entry in the anchor's action log."""
+class PostRemoveRequest(BaseModel):
+    """Schema for anchor removing a post."""
+    reason: str = Field("", max_length=300)
 
+
+# ── Response schemas ────────────────────────────────────────────────────────
+
+class AnchorStatus(BaseModel):
+    """Whether the current user is the active anchor for a neighborhood."""
+    is_anchor: bool = False
+    anchor_role_id: UUID | None = None
+    member_id: UUID | None = None
+    neighborhood_id: UUID | None = None
+    term_started_at: datetime | None = None
+    term_ends_at: datetime | None = None
+
+
+class PostPreview(BaseModel):
+    """Minimal post preview for the moderation queue."""
+    id: UUID
+    body: str
+    category: str
+    is_emergency: bool
+    author_display_name: str | None = None
+    author_member_id: UUID | None = None
+    created_at: datetime
+
+
+class ModerationItem(BaseModel):
+    """A single item in the anchor's moderation queue."""
+    id: UUID
+    post: PostPreview
+    reporter_member_id: UUID
+    reporter_display_name: str | None = None
+    reason: str
+    status: str
+    created_at: datetime
+
+
+class VouchingRequestItem(BaseModel):
+    """A vouching request in the anchor's pending list."""
+    id: UUID
+    candidate_member_id: UUID
+    candidate_display_name: str | None = None
+    initiated_by_anchor_id: UUID
+    cosigner_member_id: UUID | None = None
+    cosigner_display_name: str | None = None
+    anchor_signed_at: datetime
+    cosigner_signed_at: datetime | None = None
+    is_completed: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    created_at: datetime
+    expires_at: datetime
+
+
+class VouchingRequestCreated(BaseModel):
+    """Returned after successfully creating a vouching request."""
+    request_id: UUID
+    candidate_member_id: UUID
+    expires_at: datetime
+
+
+class EscalationItem(BaseModel):
+    """An anchor action escalation (read-only status display)."""
+    id: UUID
+    anchor_action_id: UUID
+    action_type: str
+    action_summary: str | None = None
+    status: str
+    flagged_by_count: int
+    threshold_member_count: int
+    created_at: datetime
+
+
+class AuditEntry(BaseModel):
+    """A single entry in the anchor's audit log."""
     id: UUID
     action_type: str
-    target_type: str  # post | user | verification_request
-    target_id: UUID
-    reason: Optional[str] = None
-    created_at: str
+    target_post_id: UUID | None = None
+    target_member_id: UUID | None = None
+    metadata: dict | None = None
+    created_at: datetime
 
 
-class ClassificationOverride(BaseModel):
-    """Body for overriding a post's AI classification."""
-
-    ai_classification: str  # emergency | community | general
-    is_emergency: bool
-
-
-class AnchorPostRemoval(BaseModel):
-    """Body for removing a post (soft-delete)."""
-
-    reason: str = Field(..., min_length=1, max_length=200)
-
-
-# Type aliases
-AnchorQueueAPIResponse = APIResponse[AnchorQueueResponse]
-AnchorActionLogAPIResponse = APIResponse[list[AnchorActionLogEntry]]
-AnchorRemovalAPIResponse = APIResponse[dict]
+class ReportCreated(BaseModel):
+    """Returned after successfully reporting a post."""
+    report_id: UUID
+    status: str = "open"

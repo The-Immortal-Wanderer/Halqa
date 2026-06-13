@@ -8,9 +8,9 @@ interface PeriodSelectorProps {
 }
 
 const PERIODS: { value: DashboardPeriod; label: string }[] = [
-  { value: 7, label: "7 days" },
-  { value: 30, label: "30 days" },
-  { value: 90, label: "90 days" },
+  { value: "7d", label: "7 days" },
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
 ];
 
 export function PeriodSelector({

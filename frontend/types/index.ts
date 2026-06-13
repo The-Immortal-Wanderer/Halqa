@@ -195,7 +195,92 @@ export interface WorkerListing {
   is_verified_badge: boolean;
 }
 
-// ── Tier 3 Vouching Request ────────────────────────────────────────────────
+// ── Anchor Role ────────────────────────────────────────────────────────────
+export interface AnchorStatusResponse {
+  is_anchor: boolean;
+  anchor_role_id?: string;
+  member_id?: string;
+  neighborhood_id?: string;
+  term_started_at?: string;
+  term_ends_at?: string;
+}
+
+export interface AnchorPostPreview {
+  id: string;
+  body: string;
+  category: string;
+  is_emergency: boolean;
+  author_display_name: string | null;
+  author_member_id: string | null;
+  created_at: string;
+}
+
+export interface AnchorModerationItem {
+  id: string;
+  post: AnchorPostPreview;
+  reporter_member_id: string;
+  reporter_display_name: string | null;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+export interface AnchorVouchingRequest {
+  id: string;
+  candidate_member_id: string;
+  candidate_display_name: string | null;
+  initiated_by_anchor_id: string;
+  cosigner_member_id: string | null;
+  cosigner_display_name: string | null;
+  anchor_signed_at: string;
+  cosigner_signed_at: string | null;
+  is_completed: boolean;
+  is_rejected: boolean;
+  rejection_reason: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface AnchorVouchingInitiateRequest {
+  candidate_member_id: string;
+}
+
+export interface AnchorVouchingCreated {
+  request_id: string;
+  candidate_member_id: string;
+  expires_at: string;
+}
+
+export interface AnchorEscalationItem {
+  id: string;
+  anchor_action_id: string;
+  action_type: string;
+  action_summary: string | null;
+  status: string;
+  flagged_by_count: number;
+  threshold_member_count: number;
+  created_at: string;
+}
+
+export interface AnchorAuditEntry {
+  id: string;
+  action_type: string;
+  target_post_id: string | null;
+  target_member_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ReportPostRequest {
+  reason: string;
+}
+
+export interface ReportCreated {
+  report_id: string;
+  status: string;
+}
+
+// ── Tier 3 Vouching Request (legacy) ───────────────────────────────────────
 export interface Tier3VouchingRequest {
   id: string;
   candidate_display_name: string;
@@ -206,7 +291,7 @@ export interface Tier3VouchingRequest {
 }
 
 // ── Dashboard Period ────────────────────────────────────────────────────────
-export type DashboardPeriod = 7 | 30 | 90;
+export type DashboardPeriod = "7d" | "30d" | "90d";
 
 // ── Neighborhood Membership ─────────────────────────────────────────────────
 export interface NeighborhoodMembership {
@@ -222,12 +307,15 @@ export interface NeighborhoodMembership {
 export interface CivicDashboardSnapshot {
   id: string;
   neighborhood_id: string;
+  period_type: string;
   period_start: string;
   period_end: string;
-  period_type: string;
   total_posts: number;
   emergency_posts: number;
   resolved_posts: number;
   category_breakdown: Record<string, number>;
   active_members: number;
+  created_at: string;
+  /** Present when the API enriches the snapshot with the neighborhood name */
+  neighborhood_name?: string;
 }

@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import { Plus_Jakarta_Sans, Noto_Nastaliq_Urdu } from "next/font/google";
 import "./globals.css";
+
+const PwaRegister = dynamic(
+  () => import("@/components/PwaRegister").then((m) => m.PwaRegister),
+  { ssr: false },
+);
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -37,6 +43,7 @@ export default function RootLayout({
     <html lang="en" className={`${plusJakartaSans.variable} ${notoNastaliqUrdu.variable}`}>
       <body className="font-sans bg-halqa-sand text-halqa-ink antialiased">
         {children}
+        <PwaRegister />
       </body>
     </html>
   );

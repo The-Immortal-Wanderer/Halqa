@@ -100,6 +100,7 @@ export default function FeedPage() {
           posts={posts}
           onPostTap={handlePostTap}
           loading={loading}
+          neighborhoodId={neighborhoodId}
         />
       )}
 

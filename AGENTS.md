@@ -393,8 +393,8 @@ status map for any new session.
 | Neighborhood feed (Realtime) | Complete |
 | AI alert classification | Complete (requires ANTHROPIC_API_KEY) |
 | Emergency alerts + alerts page | Complete |
-| Civic dashboard | Not started |
-| Anchor role + moderation tools | Not started |
+| Civic dashboard | Complete |
+| Anchor role + moderation tools | Complete |
 | Worker directory (listings only) | Not started |
 | PWA configuration | Not started |
 | Deep-link handler (verification notifications) | Complete |

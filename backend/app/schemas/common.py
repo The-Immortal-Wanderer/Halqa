@@ -115,11 +115,14 @@ class WorkerCategory(str, Enum):
 
 class AnchorActionType(str, Enum):
     post_removed = "post_removed"
-    post_classification_overridden = "post_classification_overridden"
-    tier3_vouched = "tier3_vouched"
-    tier3_cosigned = "tier3_cosigned"
+    post_pinned = "post_pinned"
+    post_unpinned = "post_unpinned"
     member_flagged = "member_flagged"
-    escalation_reviewed = "escalation_reviewed"
+    escalation_created = "escalation_created"
+    vouching_initiated = "vouching_initiated"
+    vouching_completed = "vouching_completed"
+    vouching_rejected = "vouching_rejected"
+    dismiss_report = "dismiss_report"
 
 
 class FlagType(str, Enum):
