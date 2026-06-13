@@ -26,7 +26,7 @@ from app.schemas.verification import (
     VerificationDocumentUpload,
     SignedUploadResponse,
 )
-from app.schemas.post import PostResponse, PostCreate, PostListResponse, FlagCreate, ClassificationResult
+from app.schemas.post import PostResponse, PostCreate, PostListResponse, ClassificationResult
 from app.schemas.dashboard import DashboardResponse, DashboardExportResponse
 from app.schemas.worker import WorkerListingResponse, WorkerListingCreate, WorkerReviewResponse, WorkerReviewCreate, WorkerListResponse
 from app.schemas.anchor import AnchorQueueResponse, AnchorActionLogEntry, ClassificationOverride, AnchorPostRemoval
@@ -43,7 +43,7 @@ __all__ = [
     "VerificationStatusResponse", "VerificationDocumentResponse",
     "VerificationResultResponse", "Tier3VouchingRequest",
     "VerificationDocumentUpload", "SignedUploadResponse",
-    "PostResponse", "PostCreate", "PostListResponse", "FlagCreate", "ClassificationResult",
+    "PostResponse", "PostCreate", "PostListResponse", "ClassificationResult",
     "DashboardResponse", "DashboardExportResponse",
     "WorkerListingResponse", "WorkerListingCreate", "WorkerReviewResponse",
     "WorkerReviewCreate", "WorkerListResponse",

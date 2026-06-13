@@ -1,24 +1,37 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Post, CreatePostRequest, ResolvePostRequest } from "@/types";
+import type { Post, PostCreateRequest, PostListResponse } from "@/types";
+
+function buildQuery(params?: {
+  category?: string;
+  emergency_only?: boolean;
+  limit?: number;
+}): string {
+  if (!params) return "";
+  const searchParams = new URLSearchParams();
+  if (params.category) searchParams.set("category", params.category);
+  if (params.emergency_only) searchParams.set("emergency_only", "true");
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : "";
+}
 
 export const postsApi = {
-  list: (neighborhoodId: string) =>
-    apiFetch<Post[]>(`/neighborhoods/${neighborhoodId}/posts`),
+  list: (
+    neighborhoodId: string,
+    params?: { category?: string; emergency_only?: boolean; limit?: number },
+  ) =>
+    apiFetch<PostListResponse>(
+      `/neighborhoods/${neighborhoodId}/posts${buildQuery(params)}`,
+    ),
 
-  create: (neighborhoodId: string, data: CreatePostRequest) =>
+  create: (neighborhoodId: string, data: PostCreateRequest) =>
     apiFetch<Post>(`/neighborhoods/${neighborhoodId}/posts`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  resolve: (data: ResolvePostRequest) =>
-    apiFetch<Post>(`/posts/${data.post_id}/resolve`, {
-      method: "POST",
-    }),
-
-  flag: (postId: string, flagType: string, description?: string) =>
-    apiFetch<Post>(`/posts/${postId}/flag`, {
-      method: "POST",
-      body: JSON.stringify({ flag_type: flagType, description }),
+  resolve: (neighborhoodId: string, postId: string) =>
+    apiFetch<Post>(`/neighborhoods/${neighborhoodId}/posts/${postId}/resolve`, {
+      method: "PATCH",
     }),
 };

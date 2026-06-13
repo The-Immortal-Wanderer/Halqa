@@ -1,102 +1,80 @@
-"""Web Push notification delivery service.
+"""Notification delivery service.
 
-Sends push notifications via the Web Push protocol (RFC 8030) for:
-- Emergency alerts (sent to all Tier 2+ members except the author)
-- Verification result notifications (sent to the individual user)
+Since push notifications (FCM/APNS) are out of scope for the prototype, all
+notifications are simulated via Supabase Realtime — we write a row to the
+notifications table, and connected clients receive the new row instantly
+because the table has Realtime enabled.
 """
 
-import json
+import asyncio
 import logging
 from uuid import UUID
+
+from app.repositories import notification_repo
 
 logger = logging.getLogger(__name__)
 
 
-# async def send_emergency_alert(db, neighborhood_id: UUID, post: dict) -> None:
-#     """Send a Web Push notification to all Tier 2+ members (except the post author)."""
-#     from pywebpush import webpush, WebPushException
-#     from app.repositories import notification_repo
-#     from app.core.config import get_settings
-#
-#     settings = get_settings()
-#     subscriptions = await notification_repo.get_neighborhood_subscriptions(
-#         db, neighborhood_id, exclude_user_id=post["author_id"], min_tier=2
-#     )
-#     category_labels = {
-#         "power": "Power", "security": "Security",
-#         "infrastructure": "Infrastructure", "water": "Water", "general": "Alert",
-#     }
-#     notification_data = {
-#         "type": "emergency_alert",
-#         "title": f"\u26a0 {category_labels.get(post.get('category', ''), 'Alert')}",
-#         "body": post.get("content", "")[:120],
-#         "data": {
-#             "post_id": str(post["id"]),
-#             "neighborhood_id": str(neighborhood_id),
-#             "deep_link": f"halqa://feed/{neighborhood_id}/post/{post['id']}",
-#         },
-#     }
-#     for subscription in subscriptions:
-#         try:
-#             webpush(
-#                 subscription_info={
-#                     "endpoint": subscription["endpoint"],
-#                     "keys": {"p256dh": subscription["p256dh"], "auth": subscription["auth"]},
-#                 },
-#                 data=json.dumps(notification_data),
-#                 vapid_private_key=settings.vapid_private_key,
-#                 vapid_claims={"sub": settings.vapid_email},
-#             )
-#         except WebPushException as e:
-#             if e.response and e.response.status_code == 410:
-#                 await notification_repo.delete_subscription(db, subscription["id"])
-#             else:
-#                 logger.error(f"Push notification failed: {e}")
+async def send_emergency_alert(
+    db,
+    post_id: UUID,
+    neighborhood_id: UUID,
+    author_member_id: UUID,
+    body_preview: str = "",
+    category: str = "general",
+) -> None:
+    """Send emergency alert notifications to all Tier 2+ members.
 
+    Per the spec, push notifications are simulated via Supabase Realtime.
+    Creates a notification row for each eligible member so their Realtime
+    subscription picks it up immediately.
+    """
+    try:
+        from app.repositories import membership_repo
 
-# async def send_verification_result(db, user_id: UUID, status: str, neighborhood_id: UUID,
-#                                      verification_record_id: UUID, rejection_reason: str | None = None) -> None:
-#     """Send a verification result notification to the user."""
-#     from pywebpush import webpush, WebPushException
-#     from app.repositories import notification_repo
-#     from app.core.config import get_settings
-#
-#     settings = get_settings()
-#     subscriptions = await notification_repo.get_user_subscriptions(db, user_id)
-#     if status == "approved":
-#         notification_data = {
-#             "type": "verification_approved",
-#             "title": "Address verified",
-#             "body": "You're now a verified member of your neighborhood.",
-#             "data": {
-#                 "neighborhood_id": str(neighborhood_id),
-#                 "deep_link": f"halqa://verification/result?status=approved&neighborhood_id={neighborhood_id}",
-#             },
-#         }
-#     else:
-#         notification_data = {
-#             "type": "verification_rejected",
-#             "title": "Verification needs attention",
-#             "body": "We couldn't verify your address. Tap to try again.",
-#             "data": {
-#                 "verification_record_id": str(verification_record_id),
-#                 "rejection_reason": rejection_reason,
-#                 "deep_link": f"halqa://verification/result?status=rejected&record_id={verification_record_id}",
-#             },
-#         }
-#     for subscription in subscriptions:
-#         try:
-#             webpush(
-#                 subscription_info={
-#                     "endpoint": subscription["endpoint"],
-#                     "keys": {"p256dh": subscription["p256dh"], "auth": subscription["auth"]},
-#                 },
-#                 data=json.dumps(notification_data),
-#                 vapid_private_key=settings.vapid_private_key,
-#                 vapid_claims={"sub": settings.vapid_email},
-#             )
-#         except WebPushException as e:
-#             if e.response and e.response.status_code == 410:
-#                 await notification_repo.delete_subscription(db, subscription["id"])
-#             else:
-#                 logger.error(f"Push notification failed: {e}")
+        members = await membership_repo.list_members(db, neighborhood_id)
+        if not members:
+            logger.info("No members to notify for post %s", post_id)
+            return
+
+        category_labels = {
+            "power": "Power",
+            "security": "Security",
+            "infrastructure": "Infrastructure",
+            "water": "Water",
+            "general": "Alert",
+        }
+
+        notification_data = {
+            "post_id": str(post_id),
+            "neighborhood_id": str(neighborhood_id),
+            "type": "emergency_alert",
+            "category": category,
+            "deep_link": f"halqa://feed/{neighborhood_id}/post/{post_id}",
+        }
+
+        for member in members:
+            # Skip the post author
+            if str(member.get("id")) == str(author_member_id):
+                continue
+            # Only notify Tier 2+
+            tier = member.get("tier", "tier_1")
+            if tier in ("tier_1",):
+                continue
+
+            user_id = member.get("user_id")
+            if not user_id:
+                continue
+
+            await notification_repo.create_notification(
+                db,
+                user_id=UUID(user_id),
+                notification_type="emergency_alert",
+                title=f"\u26a0 {category_labels.get(category, 'Alert')} Alert",
+                body=body_preview[:120] if body_preview else "",
+                data=notification_data,
+                neighborhood_id=neighborhood_id,
+            )
+
+    except Exception as e:
+        logger.error("Failed to send emergency alert for post %s: %s", post_id, e)

@@ -1,15 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ShieldCheck } from "@phosphor-icons/react";
+import { ShieldCheck, PencilSimple } from "@phosphor-icons/react";
+import { useParams } from "next/navigation";
 import { verificationApi } from "@/lib/api/verification";
-import type { VerificationStatus } from "@/types";
+import { useFeed } from "@/hooks/useFeed";
+import { FilterPills } from "@/components/feed/FilterPills";
+import { FeedList } from "@/components/feed/FeedList";
+import { EmergencyBanner } from "@/components/feed/EmergencyBanner";
+import { PostCreationSheet } from "@/components/feed/PostCreationSheet";
+import type { VerificationStatusData, Post } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export default function FeedPage() {
-  const [tier, setTier] = useState<1 | 2 | 3 | "loading">("loading");
+  const params = useParams();
+  const neighborhoodId = params.neighborhoodId as string;
+  const [tier, setTier] = useState<number | "loading">("loading");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [showSheet, setShowSheet] = useState(false);
+
+  const { posts, loading, error, activeEmergency, clearEmergency } = useFeed(
+    neighborhoodId,
+    filterCategory,
+  );
 
   useEffect(() => {
     async function load() {
@@ -28,11 +43,29 @@ export default function FeedPage() {
   }, []);
 
   const showTier1Banner = tier === 1;
+  const canPost = tier !== 1 && tier !== "loading";
+
+  const handlePostTap = useCallback((_post: Post) => {
+    console.log("post detail: not implemented");
+  }, []);
+
+  const handlePostCreated = useCallback((_post: Post) => {
+    setShowSheet(false);
+  }, []);
 
   return (
     <div>
+      {/* Emergency banner */}
+      {activeEmergency ? (
+        <EmergencyBanner
+          post={activeEmergency}
+          onDismiss={clearEmergency}
+          onTap={activeEmergency ? () => handlePostTap(activeEmergency) : undefined}
+        />
+      ) : null}
+
       {/* Tier 1 banner */}
-      {showTier1Banner && (
+      {showTier1Banner ? (
         <div className="flex items-center gap-3 bg-halqa-amber-light px-4 py-3">
           <ShieldCheck size={20} className="shrink-0 text-halqa-amber-dark" />
           <p className="flex-1 text-sm text-halqa-amber-dark">
@@ -46,9 +79,49 @@ export default function FeedPage() {
             Verify now &rarr;
           </Link>
         </div>
+      ) : null}
+
+      {/* Filter pills */}
+      <FilterPills selected={filterCategory} onSelect={setFilterCategory} />
+
+      {/* Error state */}
+      {error ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-sm text-halqa-danger">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 text-sm font-semibold text-halqa-teal underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
+        <FeedList
+          posts={posts}
+          onPostTap={handlePostTap}
+          loading={loading}
+        />
       )}
 
-      <h1 className="px-4 pt-4 text-xl font-semibold text-halqa-ink">Feed</h1>
+      {/* FAB — visible only for Tier 2+ */}
+      {canPost ? (
+        <button
+          onClick={() => setShowSheet(true)}
+          aria-label="Create a post"
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-halqa-teal text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        >
+          <PencilSimple size={24} weight="fill" />
+        </button>
+      ) : null}
+
+      {/* Post creation sheet */}
+      <PostCreationSheet
+        open={showSheet}
+        onClose={() => setShowSheet(false)}
+        neighborhoodId={neighborhoodId}
+        neighborhoodName="Green Valley"
+        onPostCreated={handlePostCreated}
+      />
     </div>
   );
 }

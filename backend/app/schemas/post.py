@@ -1,4 +1,11 @@
-"""Post (feed) request/response schemas."""
+"""Post (feed) request/response schemas.
+
+All models mirror the actual posts table in Supabase:
+- body (text), not "content"
+- author_member_id (FK to neighborhood_members), not author_id
+- ai_confidence (numeric(4,3)) as classification_confidence in API
+- ai_civic_signal for structured civic summary
+"""
 
 from __future__ import annotations
 
@@ -10,22 +17,31 @@ from pydantic import BaseModel, Field
 from app.schemas.common import APIResponse
 
 
+class AuthorInfo(BaseModel):
+    """Nested author information from users + membership join."""
+
+    id: UUID  # users.id
+    display_name: str
+    tier: str  # tier_1 | tier_2 | tier_3
+
+
 class PostResponse(BaseModel):
     """A single post in the neighborhood feed."""
 
     id: UUID
     neighborhood_id: UUID
-    author_id: UUID
-    author_display_name: str
-    content: str
+    author_member_id: UUID
+    author: AuthorInfo
+    body: str
+    body_language: str = "en"
     category: str
-    ai_classification: Optional[str] = None
     is_emergency: bool = False
+    ai_confidence: Optional[float] = None
+    classification_confidence: Optional[float] = None
+    ai_civic_signal: Optional[str] = None
     is_pinned: bool = False
     is_resolved: bool = False
     resolved_at: Optional[str] = None
-    language_detected: Optional[str] = None
-    flag_count: int = 0
     created_at: str
     updated_at: str
 
@@ -33,8 +49,9 @@ class PostResponse(BaseModel):
 class PostCreate(BaseModel):
     """Body for creating a new post."""
 
-    content: str = Field(..., min_length=2, max_length=1000)
-    category: str  # PostCategory — validated at the service/runtime level
+    body: str = Field(..., min_length=3, max_length=500)
+    category: str  # post_category enum — validated at service level
+    is_emergency: bool = False
 
 
 class PostListResponse(BaseModel):
@@ -42,27 +59,18 @@ class PostListResponse(BaseModel):
 
     posts: list[PostResponse]
     has_more: bool = False
-    next_cursor: Optional[str] = None
-
-
-class FlagCreate(BaseModel):
-    """Body for flagging a post."""
-
-    flag_type: str
-    reason: Optional[str] = Field(None, max_length=300)
 
 
 class ClassificationResult(BaseModel):
-    """Result of AI classification (returned by internal endpoint)."""
+    """Result from AI post classification."""
 
     post_id: UUID
-    classification: str  # emergency | community | general
-    confidence: float
-    language_detected: str
+    category: str
+    ai_confidence: Optional[float] = None
+    ai_civic_signal: Optional[str] = None
 
 
 # Type aliases
 PostAPIResponse = APIResponse[PostResponse]
 PostListAPIResponse = APIResponse[PostListResponse]
 FlagAPIResponse = APIResponse[dict]
-ClassificationAPIResponse = APIResponse[ClassificationResult]

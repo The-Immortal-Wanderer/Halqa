@@ -390,8 +390,9 @@ status map for any new session.
 | Authentication (Supabase Auth) | Complete |
 | Onboarding flow | Complete |
 | Verification flow (Tier 1 + Tier 2) | Complete |
-| Neighborhood feed (Realtime) | Not started |
-| AI alert classification | Not started |
+| Neighborhood feed (Realtime) | Complete |
+| AI alert classification | Complete (requires ANTHROPIC_API_KEY) |
+| Emergency alerts + alerts page | Complete |
 | Civic dashboard | Not started |
 | Anchor role + moderation tools | Not started |
 | Worker directory (listings only) | Not started |

@@ -48,6 +48,33 @@
   }
 }
 
+@keyframes halqa-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes halqa-slide-down {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes halqa-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 /* ─── Reduced Motion ───────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,29 +1,82 @@
-"""Feed and post management endpoints."""
+"""Feed and post management endpoints.
 
-from fastapi import APIRouter
+All endpoints use the standard ``APIResponse`` envelope.
+Authentication is required on all endpoints.
+"""
+
+import logging
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.params import Path
+
+from app.core.auth import get_current_member, require_tier
+from app.core.errors import ErrorCode, api_error
+from app.db.dependencies import get_db
+from app.schemas.common import AuthMember
+from app.schemas.post import PostCreate, PostListAPIResponse, PostAPIResponse
+from app.services import post_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# GET /neighborhoods/{neighborhood_id}/posts
-#   Auth: get_current_member (any tier)
-#   Query: limit, before_id (cursor pagination)
-#   → APIResponse[PostListResponse]
-#
-# POST /neighborhoods/{neighborhood_id}/posts
-#   Auth: require_tier(2)
-#   Body: PostCreate { content, category }
-#   → APIResponse[PostResponse]
-#   Triggers async AI classification after creation.
-#
-# GET /neighborhoods/{neighborhood_id}/posts/{post_id}
-#   Auth: get_current_member
-#   → APIResponse[PostResponse]
-#
-# PATCH /neighborhoods/{neighborhood_id}/posts/{post_id}/resolve
-#   Auth: get_current_member (author OR anchor)
-#   → APIResponse[PostResponse]
-#
-# POST /neighborhoods/{neighborhood_id}/posts/{post_id}/flags
-#   Auth: require_tier(2)
-#   Body: FlagCreate { flag_type, reason? }
-#   → APIResponse[{ flagged: bool }]
+
+@router.get("/neighborhoods/{neighborhood_id}/posts")
+async def list_posts(
+    neighborhood_id: UUID = Path(...),
+    category: str | None = Query(None, description="Filter by category"),
+    emergency_only: bool = Query(False, description="Show only emergency posts"),
+    limit: int = Query(20, ge=1, le=100, description="Max posts to return"),
+    member: AuthMember = Depends(get_current_member),
+    db=Depends(get_db),
+) -> PostListAPIResponse:
+    """Get the neighborhood feed with optional filters.
+
+    Ordered by: emergency first, then unresolved, then newest.
+    """
+    result = await post_service.get_feed(
+        db, neighborhood_id,
+        category=category,
+        emergency_only=emergency_only,
+        limit=limit,
+    )
+    return PostListAPIResponse.ok(data=result)
+
+
+@router.post("/neighborhoods/{neighborhood_id}/posts")
+async def create_post(
+    neighborhood_id: UUID = Path(...),
+    body: PostCreate = ...,
+    member: AuthMember = Depends(require_tier(2)),
+    db=Depends(get_db),
+) -> PostAPIResponse:
+    """Create a new post in the neighborhood feed.
+
+    Requires Tier 2 (verified) membership.
+    AI classification runs asynchronously — the post is returned immediately.
+    """
+    post = await post_service.create_post(
+        db, member, neighborhood_id,
+        body=body.body,
+        category=body.category,
+        is_emergency=body.is_emergency,
+    )
+    return PostAPIResponse.ok(data=post)
+
+
+@router.patch("/neighborhoods/{neighborhood_id}/posts/{post_id}/resolve")
+async def resolve_post(
+    neighborhood_id: UUID = Path(...),
+    post_id: UUID = Path(...),
+    member: AuthMember = Depends(get_current_member),
+    db=Depends(get_db),
+) -> PostAPIResponse:
+    """Mark a post as resolved.
+
+    Only the post author or the neighborhood anchor can resolve a post.
+    """
+    post = await post_service.resolve_post(
+        db, post_id, neighborhood_id, member,
+    )
+    return PostAPIResponse.ok(data=post)

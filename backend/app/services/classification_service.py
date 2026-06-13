@@ -44,10 +44,12 @@ Respond with ONLY a valid JSON object, no other text:
   "ai_classification": "emergency" | "community" | "general",
   "is_emergency": true | false,
   "language_detected": "en" | "ur" | "mixed",
-  "confidence": 0.0 to 1.0
+  "confidence": 0.0 to 1.0,
+  "civic_signal": "Brief 1-sentence structured description for the civic dashboard (e.g., '3-hour power outage in G-11 sector, 14 reports, resolved')"
 }
 
 "is_emergency" must be true if and only if ai_classification is "emergency".
+"civic_signal" should be a concise, structured summary useful for aggregation.
 """
 
 
@@ -55,7 +57,7 @@ async def classify_post(content: str, category: str) -> dict:
     """Classify a post using the Anthropic Claude API.
 
     Returns a dict with ``ai_classification``, ``is_emergency``,
-    ``language_detected``, and ``confidence``.
+    ``language_detected``, ``confidence``, and ``civic_signal``.
 
     Never raises — returns a safe fallback on any API error.
     """
@@ -70,7 +72,7 @@ async def classify_post(content: str, category: str) -> dict:
     try:
         response = await client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=200,
+            max_tokens=250,
             system=CLASSIFICATION_PROMPT,
             messages=[{"role": "user", "content": user_message}],
         )
@@ -80,7 +82,13 @@ async def classify_post(content: str, category: str) -> dict:
         assert result["ai_classification"] in ("emergency", "community", "general")
         assert isinstance(result["is_emergency"], bool)
         assert result["language_detected"] in ("en", "ur", "mixed")
-        return result
+        return {
+            "ai_classification": result["ai_classification"],
+            "is_emergency": result["is_emergency"],
+            "language_detected": result["language_detected"],
+            "confidence": result.get("confidence", 0.0),
+            "civic_signal": result.get("civic_signal", ""),
+        }
     except Exception as e:
         logger.error(f"Classification failed: {e}")
         return {
@@ -88,5 +96,5 @@ async def classify_post(content: str, category: str) -> dict:
             "is_emergency": False,
             "language_detected": "mixed",
             "confidence": 0.0,
+            "civic_signal": "",
         }
-
