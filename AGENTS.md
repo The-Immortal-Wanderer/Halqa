@@ -384,10 +384,10 @@ Update this section as features are completed. This is the authoritative
 status map for any new session.
 
 | Feature | Status |
-|---|---|
+|---|---|---|
 | Project scaffolding | Complete |
 | Database migrations | Complete |
-| Authentication (Supabase Auth) | Complete |
+| Authentication (Supabase Auth) | Complete — demo mode bypasses frontend auth |
 | Onboarding flow | Complete |
 | Verification flow (Tier 1 + Tier 2) | Complete |
 | Neighborhood feed (Realtime) | Complete |
@@ -399,3 +399,12 @@ status map for any new session.
 | PWA configuration | Not started |
 | Deep-link handler (verification notifications) | Complete |
 | Vercel + Render deployment | Not started |
+
+---
+
+### Demo Mode
+
+For prototype walkthrough, auth gates in `middleware.ts`, `app/(app)/layout.tsx`, and
+`app/page.tsx` are bypassed with `// DEMO MODE` comments. All pages render without
+authentication. Backend API calls will return 401 if no valid session token is sent.
+To restore production auth, revert changes in those three files and rebuild.
