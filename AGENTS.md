@@ -271,6 +271,10 @@ what to do next. Never expose API error codes or stack traces to the user.
 - No secrets in code. No secrets in comments. All secrets in environment
   variables. The `.env` file is in `.gitignore`. An `.env.example` with
   placeholder values is committed.
+- Never commit files containing credentials, tokens, or passwords to any
+  directory including /docs/. Use .gitignore proactively. If credentials
+  are accidentally committed, purge them from git history immediately
+  using git filter-repo.
 - User addresses are never returned in API responses as raw strings to
   client-side code. The neighborhood_id is the public identifier. Address
   details are accessible only to the platform's admin service role.
