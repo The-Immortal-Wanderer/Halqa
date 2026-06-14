@@ -19,3 +19,9 @@ backend/uvi_*.log
 
 # Temp debug scripts
 backend/scripts/
+
+# Security — never commit credential-containing scripts
+docs/submission-screenshots/
+
+# Safety net for developers who create frontend/.env instead of .env.local
+frontend/.env
