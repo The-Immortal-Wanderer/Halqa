@@ -17,7 +17,7 @@
 --   # Login (save user_id + access_token)
 --   curl -X POST http://localhost:8000/api/v1/auth/login \
 --     -H "Content-Type: application/json" \
---     -d '{"email": "anchor@halqa.demo", "password": "Demo@123"}'
+--     -d '{"email": "anchor@halqa.demo", "password": "REPLACE_WITH_REAL_PASSWORD"}'
 --
 --   # Join Green Valley
 --   curl -X POST http://localhost:8000/api/v1/members/join \
