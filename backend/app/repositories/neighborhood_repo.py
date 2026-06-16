@@ -43,7 +43,7 @@ async def create(db: Client, name: str, city: str, sector_or_area: str | None = 
     """Create a new neighborhood."""
     row = {"name": name, "city": city}
     if sector_or_area:
-        row["sector_or_area"] = sector_or_area
+        row["sector"] = sector_or_area
 
     def _create():
         return db.table("neighborhoods").insert(row).execute()

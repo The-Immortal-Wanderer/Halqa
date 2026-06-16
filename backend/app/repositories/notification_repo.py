@@ -84,16 +84,19 @@ async def create_notification(
         from app.core.config import get_settings
         settings = get_settings()
         client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        payload = {
+            "user_id": str(user_id),
+            "type": notification_type,
+            "title": title,
+            "body": body,
+            "data": {k: v for k, v in (data or {}).items() if k != "deep_link"},
+            "neighborhood_id": str(neighborhood_id) if neighborhood_id else None,
+        }
+        if data and "deep_link" in data:
+            payload["deep_link"] = data["deep_link"]
         result = (
             client.table("notifications")
-            .insert({
-                "user_id": str(user_id),
-                "type": notification_type,
-                "title": title,
-                "body": body,
-                "data": data or {},
-                "neighborhood_id": str(neighborhood_id) if neighborhood_id else None,
-            })
+            .insert(payload)
             .execute()
         )
         return result.data[0]

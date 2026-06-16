@@ -12,6 +12,7 @@ supabase/.temp/
 # Runtime artifacts
 *.log
 *_pid.txt
+*.pid
 tsconfig.tsbuildinfo
 .playwright-mcp/
 backend/server_*.log

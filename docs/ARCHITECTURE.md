@@ -80,17 +80,17 @@ No password-based auth. No social login (Google, Apple).
 ### 2.2 JWT Flow
 
 ```
-1. User completes OTP/magic link via Supabase Auth
+1. User signs in via Supabase Auth (email/password)
 2. Supabase issues access_token (JWT) + refresh_token
 3. Frontend stores tokens in memory (not localStorage — PWA constraint)
    using Supabase client's built-in session management
 4. All FastAPI requests include: Authorization: Bearer {access_token}
-5. FastAPI validates JWT using HS256 with the Supabase JWT secret:
-   The decoded payload is checked for ``aud: "authenticated"`` and
-   ``sub`` (user_id). This is the standard Supabase Auth verification
-   pattern — simpler than JWKS and avoids an HTTP request per validation.
-6. Validated token payload provides: sub (user_id), role, aud, exp
-7. user_id extracted from token.sub — never from request body
+5. FastAPI validates the JWT by calling the GoTrue /auth/v1/user endpoint.
+   This is more reliable than local HS256 or JWKS verification because it
+   works regardless of Supabase's signing algorithm (ES256) and avoids
+   manual key management.
+6. The validated response provides the user's id, email, and metadata.
+7. user_id extracted from the GoTrue response — never from request body.
 ```
 
 ### 2.3 FastAPI Auth Middleware
@@ -103,10 +103,9 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: SupabaseClient = Depends(get_db)
 ) -> AuthUser:
-    token = credentials.credentials
-    # Validate JWT (HS256 with Supabase JWT secret)
-    payload = verify_supabase_jwt(token)
-    user_id = UUID(payload["sub"])
+    # Verify JWT via GoTrue — works with ES256 tokens from Supabase Auth
+    user_data = await verify_supabase_jwt(token)
+    user_id = UUID(user_data["id"])
     # Fetch user profile from users table
     user = await user_repo.get_by_id(user_id)
     if not user or user.deleted_at:

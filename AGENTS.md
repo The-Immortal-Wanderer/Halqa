@@ -69,7 +69,7 @@ sibling subdirectories. Do not split into separate repositories.
 - Frontend reads the backend's URL via `NEXT_PUBLIC_API_URL` (set in
   `frontend/.env.local` for dev, Vercel project settings for production).
 - Backend reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `SUPABASE_JWT_SECRET`, and `ANTHROPIC_API_KEY` via `app/core/config.py`
+  `SUPABASE_ANON_KEY`, and `ANTHROPIC_API_KEY` via `app/core/config.py`
   (set in `backend/.env` for dev, Render environment settings for production).
 - Frontend reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   directly for Supabase Auth and Realtime — these are public-safe keys.
@@ -402,6 +402,7 @@ status map for any new session.
 | Worker directory (listings only) | Not started |
 | PWA configuration | Not started |
 | Deep-link handler (verification notifications) | Complete |
+| Post-security-upgrade cleanup + bug fixes | Complete — config, 7 runtime bugs, error envelope, CORS, AI timeouts, token refresh, docs |
 | Vercel + Render deployment | Not started |
 
 ---

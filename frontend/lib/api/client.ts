@@ -19,15 +19,36 @@ export async function apiFetch<T>(
   data: T | null;
   error: { code: string; message: string } | null;
 }> {
-  const token = await getAccessToken();
-  const response = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("No active session");
+
+  async function request(token: string): Promise<Response> {
+    return fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+  }
+
+  let response = await request(session.access_token);
+
+  // 401 → refresh token and retry exactly once
+  if (response.status === 401) {
+    const {
+      data: { session: refreshed },
+    } = await supabase.auth.refreshSession();
+
+    if (refreshed) {
+      response = await request(refreshed.access_token);
+    }
+  }
+
   const json = await response.json();
   return json; // Always returns { data, error } envelope
 }

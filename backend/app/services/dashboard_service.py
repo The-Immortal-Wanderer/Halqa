@@ -71,7 +71,7 @@ async def compute_snapshot(
             .eq("neighborhood_id", str(neighborhood_id))
             .gte("created_at", period_start.isoformat())
             .lt("created_at", period_end.isoformat())
-            .is_("deleted_at", None)
+            .eq("is_removed", False)
             .execute()
         )
         return result.data if result else []

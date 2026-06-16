@@ -97,8 +97,7 @@ from typing import Literal
 class Settings(BaseSettings):
     # Supabase
     supabase_url: str
-    supabase_service_role_key: str
-    supabase_jwt_secret: str
+    supabase_anon_key: str
 
     # Anthropic
     anthropic_api_key: str
@@ -288,7 +287,6 @@ directly — only repositories do.
 
 ```python
 import httpx
-from jose import jwt, JWTError
 from uuid import UUID
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -300,18 +298,26 @@ from app.schemas.common import AuthUser, AuthMember, AuthAnchor
 
 security = HTTPBearer()
 
-def verify_supabase_jwt(token: str) -> dict:
+async def verify_supabase_jwt(token: str) -> dict:
+    """Validate a Supabase JWT via the GoTrue user endpoint.
+    
+    Calls GET /auth/v1/user with the Bearer token. This is the most
+    reliable verification method — it works regardless of signing algorithm
+    (HS256 or ES256) and avoids manual JWKS key management.
+    """
     settings = get_settings()
-    try:
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": settings.supabase_anon_key,
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{settings.supabase_url}/auth/v1/user",
+            headers=headers,
         )
-        return payload
-    except JWTError:
+    if resp.status_code != 200:
         raise api_error(401, ErrorCode.UNAUTHORIZED, "Invalid or expired token")
+    return resp.json()
 
 
 async def get_current_user(
@@ -1427,7 +1433,7 @@ services:
         sync: false           # Set via Render dashboard
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: SUPABASE_JWT_SECRET
+      - key: SUPABASE_ANON_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false

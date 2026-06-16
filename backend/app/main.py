@@ -7,8 +7,10 @@ Usage::
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -53,7 +55,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
@@ -70,6 +72,50 @@ def create_app() -> FastAPI:
     app.include_router(anchor.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(internal.router, prefix="/internal")
+
+    # --- Standard error envelope handler ---
+    # Converts FastAPI's default HTTPException detail into the project's
+    # standard response envelope: {"data": null, "error": {"code": ..., "message": ...}}
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            code = detail.get("code", "INTERNAL_SERVER_ERROR")
+            message = detail.get("message", str(detail))
+        else:
+            # Map common FastAPI security detail strings to proper codes
+            detail_str = str(detail)
+            if detail_str == "Not authenticated":
+                code = "UNAUTHORIZED"
+            else:
+                code = "INTERNAL_SERVER_ERROR"
+            message = detail_str
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"data": None, "error": {"code": code, "message": message}},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "data": None,
+                "error": {
+                    "code": "INVALID_PARAMETERS",
+                    "message": str(exc),
+                },
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled exception: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"data": None, "error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected error occurred"}},
+        )
 
     logger.info("Halqa API application created (environment=%s)", settings.environment)
     return app

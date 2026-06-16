@@ -10,6 +10,7 @@ Decision thresholds:
 - confidence < 0.40 OR document_unreadable → auto-reject
 """
 
+import asyncio
 import json
 import logging
 
@@ -64,23 +65,29 @@ async def extract_address(signed_url: str, declared_address: str) -> dict:
     prompt = DOCUMENT_OCR_PROMPT.format(declared_address=declared_address)
 
     try:
-        response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {"type": "url", "url": signed_url},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+        response = await asyncio.wait_for(
+            client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=300,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {"type": "url", "url": signed_url},
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+            ),
+            timeout=30.0,
         )
         return json.loads(response.content[0].text)
+    except asyncio.TimeoutError:
+        logger.error(f"OCR timed out after 30s")
+        return {"confidence": 0.0, "rejection_reason": "document_unreadable"}
     except Exception as e:
         logger.error(f"OCR failed: {e}")
         return {"confidence": 0.0, "rejection_reason": "document_unreadable"}

@@ -82,7 +82,7 @@ curl http://localhost:8000/health
 |---|---|
 | `SUPABASE_URL` | Supabase project → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API (service role, keep secret) |
-| `SUPABASE_JWT_SECRET` | Supabase project → Settings → API → JWT Secret |
+| `SUPABASE_ANON_KEY` | Supabase project → Settings → API (anon/publishable key) |
 | `ANTHROPIC_API_KEY` | Anthropic Console → API Keys |
 | `VAPID_PUBLIC_KEY` | Generated VAPID key pair |
 | `VAPID_PRIVATE_KEY` | Generated VAPID key pair |

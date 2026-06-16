@@ -7,6 +7,7 @@ to comply with the ``async/await throughout`` mandate.
 
 import asyncio
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from supabase import Client
@@ -149,7 +150,7 @@ async def mark_resolved(
             db.table("posts")
             .update({
                 "is_resolved": True,
-                "resolved_at": "now()",
+                "resolved_at": datetime.utcnow().isoformat(),
                 "resolved_by_member_id": str(resolved_by_member_id),
             })
             .eq("id", str(post_id))

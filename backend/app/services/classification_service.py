@@ -7,6 +7,7 @@ Handles Pakistani mixed-language content (English, Urdu, Roman Urdu).
 All errors are caught and return safe fallbacks — never propagate to the caller.
 """
 
+import asyncio
 import json
 import logging
 
@@ -70,11 +71,14 @@ async def classify_post(content: str, category: str) -> dict:
     user_message = f"Post category declared by author: {category}\n\nPost content:\n{content}"
 
     try:
-        response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=250,
-            system=CLASSIFICATION_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
+        response = await asyncio.wait_for(
+            client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=250,
+                system=CLASSIFICATION_PROMPT,
+                messages=[{"role": "user", "content": user_message}],
+            ),
+            timeout=30.0,
         )
         raw = response.content[0].text
         result = json.loads(raw)

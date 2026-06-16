@@ -160,6 +160,12 @@ async def _run_ocr_and_decide(
         result = await ocr_service.extract_address(signed_url, declared_address)
     except Exception:
         logger.exception("OCR processing failed for record %s", record_id)
+        # Don't leave the record stuck in pending — reject with processing error
+        # so the user can see the result and resubmit.
+        await verification_repo.set_rejected(
+            tdb, record_id, "processing_error", ocr_confidence=0.0,
+        )
+        await _create_notification(tdb, user_id, neighborhood_id, False, "processing_error")
         return
 
     confidence = result.get("confidence", 0.0)
@@ -230,6 +236,7 @@ async def _create_notification(
                 "deep_link": (
                     f"halqa://verification/result?status=rejected"
                     f"&neighborhood_id={neighborhood_id}"
+                    f"&reason={rejection_reason or 'address_mismatch'}"
                 ),
             },
             neighborhood_id=neighborhood_id,

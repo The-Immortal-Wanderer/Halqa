@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from supabase import Client
@@ -72,7 +73,7 @@ async def upgrade_tier(db: Client, user_id: UUID, neighborhood_id: UUID, new_tie
     def _update():
         return (
             db.table("neighborhood_members")
-            .update({"tier": new_tier, "tier_upgraded_at": "now()"})
+            .update({"tier": new_tier, "tier_upgraded_at": datetime.utcnow().isoformat()})
             .eq("user_id", str(user_id))
             .eq("neighborhood_id", str(neighborhood_id))
             .execute()

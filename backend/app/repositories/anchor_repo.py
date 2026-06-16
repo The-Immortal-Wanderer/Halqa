@@ -334,6 +334,98 @@ def get_member_display_name(*, member_id: UUID) -> str | None:
         client.auth.sign_out()
 
 
+async def is_active_anchor(db, user_id: UUID, neighborhood_id: UUID) -> bool:
+    """Check if a user is an active anchor in a neighborhood.
+
+    Args:
+        db: Supabase client (unused — anchor_repo creates its own client).
+        user_id: The user's UUID.
+        neighborhood_id: The neighborhood's UUID.
+
+    Returns:
+        True if the user is an active anchor, False otherwise.
+    """
+    import asyncio
+
+    def _check():
+        client = new_thread_safe_client()
+        try:
+            # First find the user's membership in the neighborhood
+            membership = (
+                client.table("neighborhood_members")
+                .select("id")
+                .eq("user_id", str(user_id))
+                .eq("neighborhood_id", str(neighborhood_id))
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            if not membership or not membership.data:
+                return False
+
+            member_id = membership.data["id"]
+            # Then check if that membership has an active anchor role
+            result = (
+                client.table("anchor_roles")
+                .select("id")
+                .eq("member_id", str(member_id))
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            return result.data is not None
+        finally:
+            client.auth.sign_out()
+
+    return await asyncio.to_thread(_check)
+
+
+async def get_active(db, user_id: UUID, neighborhood_id: UUID) -> dict | None:
+    """Return the active anchor role for a user in a neighborhood, or None.
+
+    Args:
+        db: Supabase client (unused — anchor_repo creates its own client).
+        user_id: The user's UUID.
+        neighborhood_id: The neighborhood's UUID.
+
+    Returns:
+        The anchor role dict, or None if the user is not an active anchor.
+    """
+    import asyncio
+
+    def _fetch():
+        client = new_thread_safe_client()
+        try:
+            # First find the user's membership
+            membership = (
+                client.table("neighborhood_members")
+                .select("id")
+                .eq("user_id", str(user_id))
+                .eq("neighborhood_id", str(neighborhood_id))
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            if not membership or not membership.data:
+                return None
+
+            member_id = membership.data["id"]
+            # Then look up their anchor role
+            result = (
+                client.table("anchor_roles")
+                .select("*")
+                .eq("member_id", str(member_id))
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            return result.data if result and result.data else None
+        finally:
+            client.auth.sign_out()
+
+    return await asyncio.to_thread(_fetch)
+
+
 def get_membership_by_user(*, user_id: UUID, neighborhood_id: UUID) -> dict | None:
     """Get a user's membership in a neighborhood."""
     client = new_thread_safe_client()

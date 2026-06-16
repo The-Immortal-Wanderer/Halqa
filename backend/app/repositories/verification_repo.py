@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from supabase import Client
@@ -111,7 +112,7 @@ async def set_approved(
 
         update = {
             "status": "approved",
-            "reviewed_at": "now()",
+            "reviewed_at": datetime.utcnow().isoformat(),
         }
         if extracted_address is not None:
             update["extracted_address"] = extracted_address
@@ -149,7 +150,7 @@ async def set_rejected(
         update = {
             "status": "rejected",
             "rejection_reason": rejection_reason,
-            "reviewed_at": "now()",
+            "reviewed_at": datetime.utcnow().isoformat(),
         }
         if ocr_confidence is not None:
             update["ocr_confidence"] = ocr_confidence
@@ -263,7 +264,7 @@ async def mark_document_deleted(db: Client, document_id: UUID) -> None:
             "Prefer": "return=minimal",
         }
         payload = {
-            "deleted_from_storage_at": "now()",
+            "deleted_from_storage_at": datetime.utcnow().isoformat(),
         }
         with httpx.Client() as client:
             response = client.patch(
