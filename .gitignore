@@ -26,3 +26,9 @@ docs/submission-screenshots/
 
 # Safety net for developers who create frontend/.env instead of .env.local
 frontend/.env
+
+# Credential-containing temp files
+anchor_token.json
+backend_out.log
+backend_err.log
+tmp_*.json
