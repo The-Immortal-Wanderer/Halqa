@@ -68,7 +68,7 @@ neighborhood_members (Tier 3 vouching)
 
 ---
 
-## 2. Table Definitions
+## 2. Table Definitions (Active & Working Schema)
 
 ---
 
@@ -87,38 +87,31 @@ stage, enforced by application logic).
 | `id` | `UUID` | NO | — | FK to `auth.users.id`. Primary key. |
 | `display_name` | `TEXT` | NO | — | Name as the user's neighbors know them. Max 60 chars. |
 | `phone` | `TEXT` | YES | NULL | E.164 format. Indexed. Unique where not null. |
-| `email` | `TEXT` | YES | NULL | Lowercase. Indexed. Unique where not null. |
-| `onboarding_complete` | `BOOLEAN` | NO | `false` | True once user has joined a neighborhood (any tier). |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Account creation time. |
+| `avatar_url` | `TEXT` | YES | NULL | URL to user's uploaded avatar. |
+| `preferred_language` | `TEXT` | NO | `'en'` | Display language preference: `'en'` or `'ur'`. |
+| `push_token` | `TEXT` | YES | NULL | FCM/APNS push token for devices. |
+| `onboarding_complete` | `BOOLEAN` | NO | `false` | True once user has joined a neighborhood. Added via migration. |
+| `is_active` | `BOOLEAN` | NO | `true` | False if the user profile is deactivated (soft delete). |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Profile creation time. |
 | `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Last profile update. Maintained by trigger. |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete timestamp. |
 
 **Constraints:**
 - `CHECK (char_length(display_name) >= 2 AND char_length(display_name) <= 60)`
-- `CHECK (phone IS NOT NULL OR email IS NOT NULL)` — at least one contact.
-- `UNIQUE (phone) WHERE phone IS NOT NULL AND deleted_at IS NULL`
-- `UNIQUE (email) WHERE email IS NOT NULL AND deleted_at IS NULL`
+- `UNIQUE (phone) WHERE phone IS NOT NULL AND is_active = true`
 
 **Indexes:**
 - `idx_users_phone` on `(phone)` where `phone IS NOT NULL`
-- `idx_users_email` on `(email)` where `email IS NOT NULL`
-- `idx_users_deleted_at` on `(deleted_at)` where `deleted_at IS NOT NULL`
+- `idx_users_active` on `(is_active)` where `is_active = true`
 
 **RLS Policies:**
-- `SELECT`: Users can read their own row. Anchor of a shared neighborhood
-  can read display_name and id of members (joined via neighborhood_members).
-  No other user can read another user's full row.
-- `UPDATE`: Users can update their own display_name only.
+- `SELECT`: Users can read their own row. Anchor of a shared neighborhood can read display_name and id of members.
+- `UPDATE`: Users can update their own display_name and preferred_language.
 - `INSERT`: Handled by auth trigger — not directly insertable by users.
-- `DELETE`: Not permitted via RLS. Soft delete only via `deleted_at`.
+- `DELETE`: Not permitted. Soft delete via `is_active = false`.
 
-**Trigger:**
-```sql
--- Automatically update updated_at on any row change
-CREATE TRIGGER set_updated_at
-BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION moddatetime(updated_at);
-```
+> [!NOTE]
+> - **email**: Originally planned as a column on the `users` table. In the working prototype, email validation is handled by Supabase Auth, and the email address is retrieved from `auth.users` instead of duplicated in `public.users`.
+> - **deleted_at**: Soft deletes were originally planned using a `deleted_at` timestamp. The active implementation uses the simpler `is_active = false` flag.
 
 ---
 
@@ -129,523 +122,497 @@ housing society block, or a defined community area.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `name` | `TEXT` | NO | — | Display name. e.g. "Street 7, DHA Phase 5" or "Block C, Bahria Town". Max 120 chars. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `name` | `TEXT` | NO | — | Display name. e.g. "Street 7, DHA Phase 5". Max 120 chars. |
+| `name_urdu` | `TEXT` | YES | NULL | Urdu script name display. |
 | `city` | `TEXT` | NO | — | City name. Max 60 chars. |
-| `sector_or_area` | `TEXT` | YES | NULL | Sub-area within city (sector, phase, district). Max 80 chars. |
-| `member_count` | `INTEGER` | NO | `0` | Cached count of Tier 2+ members. Updated by trigger. |
-| `total_member_count` | `INTEGER` | NO | `0` | Cached count of all members (all tiers). Updated by trigger. |
+| `sector` | `TEXT` | YES | NULL | Sub-area within city (e.g., "Phase 5", "G-11"). Max 80 chars. |
+| `province` | `TEXT` | NO | — | Province name (e.g. "Punjab", "Sindh"). |
+| `lat` | `NUMERIC(9,6)` | YES | NULL | Center latitude coordinate. |
+| `lng` | `NUMERIC(9,6)` | YES | NULL | Center longitude coordinate. |
+| `boundary_geojson` | `JSONB` | YES | NULL | GeoJSON boundary polygon. |
+| `member_count` | `INTEGER` | NO | `0` | Cached count of active members (updated by trigger). |
 | `is_active` | `BOOLEAN` | NO | `true` | False if neighborhood is suspended or merged. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
 | `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Maintained by trigger. |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete. |
 
 **Constraints:**
 - `CHECK (char_length(name) >= 3 AND char_length(name) <= 120)`
 - `CHECK (member_count >= 0)`
-- `CHECK (total_member_count >= member_count)`
 
 **Indexes:**
 - `idx_neighborhoods_name_trgm` on `name` using GIN with `gin_trgm_ops`
-  — enables fast trigram search for neighborhood name lookup.
 - `idx_neighborhoods_city` on `(city)`
 - `idx_neighborhoods_active` on `(is_active)` where `is_active = true`
 
 **RLS Policies:**
-- `SELECT`: Any authenticated user can read non-deleted neighborhoods.
-  (Neighborhood search must be possible before joining.)
-- `INSERT`: Only service role. New neighborhoods created via the backend
-  service, not directly by users.
+- `SELECT`: Any authenticated user can read active neighborhoods.
+- `INSERT`: Only service role.
 - `UPDATE`: Only service role.
-- `DELETE`: Not permitted. Soft delete via `deleted_at`.
+- `DELETE`: Not permitted. Soft delete via `is_active = false`.
+
+> [!NOTE]
+> - **sector**: Originally named `sector_or_area`. It is simplified to `sector` in the database.
+> - **total_member_count**: Originally planned to distinguish between verified and unverified member counts. The prototype uses a single trigger-managed `member_count` to represent active neighborhood members.
+> - **deleted_at**: Soft deletes are handled via `is_active = false`.
 
 ---
 
 ### 2.3 `neighborhood_members`
 
 **Purpose:** Join table between users and neighborhoods. Stores tier, join
-date, and verification state per membership.
+date, and active membership state.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `user_id` | `UUID` | NO | — | FK to `users.id`. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `tier` | `INTEGER` | NO | `1` | Verification tier: 1, 2, or 3. |
+| `tier` | `verification_tier` | NO | `'tier_1'` | ENUM: `'tier_1'`, `'tier_2'`, `'tier_3'`. |
+| `declared_address` | `TEXT` | NO | — | Free-text address as entered by user. |
 | `joined_at` | `TIMESTAMPTZ` | NO | `now()` | When the user joined this neighborhood. |
 | `tier_upgraded_at` | `TIMESTAMPTZ` | YES | NULL | When the user last moved to a higher tier. |
 | `is_active` | `BOOLEAN` | NO | `true` | False if membership is suspended. |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete (user left neighborhood). |
 
 **Constraints:**
-- `UNIQUE (user_id, neighborhood_id) WHERE deleted_at IS NULL`
-  — one active membership per user per neighborhood.
-- `CHECK (tier IN (1, 2, 3))`
+- `UNIQUE (user_id, neighborhood_id)`
 
 **Indexes:**
-- `idx_nm_user_id` on `(user_id)` where `deleted_at IS NULL`
-- `idx_nm_neighborhood_id` on `(neighborhood_id)` where `deleted_at IS NULL`
-- `idx_nm_tier` on `(neighborhood_id, tier)` where `deleted_at IS NULL`
-  — supports counting Tier 2+ members for escalation threshold calculation.
+- `idx_nm_user` on `(user_id)`
+- `idx_nm_neighborhood` on `(neighborhood_id)`
+- `idx_nm_tier` on `(neighborhood_id, tier)`
+- `idx_nm_active` on `(is_active)` where `is_active = true`
 
 **RLS Policies:**
-- `SELECT`: A user can read their own membership row. An anchor can read
-  all membership rows for their neighborhood. Members can see the count and
-  tier distribution (aggregate), not individual user memberships.
-- `INSERT`: Service role only. Users join via the backend endpoint.
-- `UPDATE`: Service role only. Tier changes via backend service.
-- `DELETE`: Not permitted. Soft delete via `deleted_at`.
+- `SELECT`: A user can read their own membership row. Peers can read basic memberships for verified users (`tier_2+`).
+- `INSERT`: Users join via the `/members/join` API endpoint.
+- `UPDATE`: Tier upgrades managed by verification services.
+- `DELETE`: Not permitted. Soft delete via `is_active = false`.
 
-**Trigger:** On INSERT or UPDATE of `tier` column, update the
-`neighborhoods.member_count` (Tier 2+ count) and
-`neighborhoods.total_member_count` (all tiers).
+> [!NOTE]
+> - **tier**: Originally planned as integer values `1 | 2 | 3`. The active database uses a custom PostgreSQL enum `verification_tier` (`'tier_1'`, `'tier_2'`, `'tier_3'`).
+> - **deleted_at**: Soft deletes are handled via `is_active = false`.
 
 ---
 
 ### 2.4 `verification_records`
 
-**Purpose:** Tracks the full verification lifecycle for a user's membership.
-One record per user per neighborhood membership. Contains the only location
-where address data is stored — service role access only.
+**Purpose:** Tracks the verification lifecycle for a user's neighborhood membership.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `user_id` | `UUID` | NO | — | FK to `users.id`. |
-| `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
-| `tier_target` | `INTEGER` | NO | — | Which tier this verification attempt is for (2 or 3). |
-| `status` | `TEXT` | NO | `'pending'` | Enum: `pending`, `approved`, `rejected`, `expired`. |
-| `submitted_at` | `TIMESTAMPTZ` | NO | `now()` | When documents were submitted. |
-| `decided_at` | `TIMESTAMPTZ` | YES | NULL | When status changed to approved/rejected. |
-| `rejection_reason` | `TEXT` | YES | NULL | One of four defined rejection reason codes (see PRD). |
-| `address_submitted` | `TEXT` | YES | NULL | Address string as entered by user. Service role only. |
-| `address_extracted` | `TEXT` | YES | NULL | Address extracted by OCR from documents. Service role only. |
-| `ocr_confidence` | `DECIMAL(4,3)` | YES | NULL | OCR confidence score 0.000–1.000. |
-| `reviewer_notes` | `TEXT` | YES | NULL | Internal notes from manual review. Service role only. |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Maintained by trigger. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
+| `status` | `verification_status`| NO | `'pending'` | ENUM: `'pending'`, `'approved'`, `'rejected'`, `'expired'`. |
+| `tier_target` | `INTEGER` | NO | `2` | Mapped target tier (2 or 3). Added via migration. |
+| `declared_address` | `TEXT` | NO | — | Declared address snapshot. |
+| `extracted_address` | `TEXT` | YES | NULL | Address string extracted by AI OCR. |
+| `ocr_confidence` | `DECIMAL(4,3)` | YES | NULL | AI confidence score (0.000 to 1.000). |
+| `rejection_reason` | `TEXT` | YES | NULL | ENUM check values: `'address_mismatch'`, `'document_unreadable'`, `'name_not_found'`, `'document_type_invalid'`. |
+| `reviewer_notes` | `TEXT` | YES | NULL | Manual review notes. |
+| `reviewed_by` | `UUID` | YES | NULL | FK to `users.id` (null if auto-processed). |
+| `submitted_at` | `TIMESTAMPTZ` | NO | `now()` | Document submission timestamp. |
+| `reviewed_at` | `TIMESTAMPTZ` | YES | NULL | Timestamp of decision (approval or rejection). |
+| `decided_at` | `TIMESTAMPTZ` | YES | NULL | Migration-added decision timestamp (unused by backend in favor of `reviewed_at`). |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Record creation timestamp. |
 
 **Constraints:**
 - `CHECK (tier_target IN (2, 3))`
-- `CHECK (status IN ('pending', 'approved', 'rejected', 'expired'))`
 - `CHECK (ocr_confidence IS NULL OR (ocr_confidence >= 0 AND ocr_confidence <= 1))`
-- `CHECK (rejection_reason IN ('address_mismatch', 'document_unreadable', 'name_not_found', 'document_type_invalid') OR rejection_reason IS NULL)`
-- One active (non-expired) pending or approved record per user per
-  neighborhood enforced at application layer.
 
 **Indexes:**
-- `idx_vr_user_id` on `(user_id)`
-- `idx_vr_membership_id` on `(membership_id)`
-- `idx_vr_status` on `(status)` where `status = 'pending'`
+- `idx_vr_member` on `(member_id)`
+- `idx_vr_status` on `(status)`
+- `idx_vr_pending` on `(status, submitted_at)` where `status = 'pending'`
 
 **RLS Policies:**
-- `SELECT`: Users can read their own verification records (excluding
-  `address_submitted`, `address_extracted`, `reviewer_notes` — these
-  columns are service role only via a separate secure view).
-- `INSERT`: Service role only.
-- `UPDATE`: Service role only.
-- `DELETE`: Not permitted.
+- `SELECT`: Users can read their own verification records.
+- `INSERT`: Allowed for authenticated users submitting their own documents.
+- `UPDATE`/`DELETE`: Service role only.
+
+> [!NOTE]
+> - **member_id**: The original plan detailed three FK columns (`user_id`, `neighborhood_id`, and `membership_id`). In the working database, this is simplified into `member_id` which points directly to `neighborhood_members.id` (avoiding redundant schemas).
+> - **address_submitted** and **address_extracted**: Renamed to `declared_address` and `extracted_address`.
+> - **decided_at**: Added in a migration, but the backend services write to `reviewed_at` to mark decisions.
 
 ---
 
 ### 2.5 `verification_documents`
 
-**Purpose:** References to documents uploaded to Supabase Storage for
-verification. The actual files live in the `verification-docs` private
-storage bucket. This table tracks the reference and deletion status.
-
-**Critical:** Document files must be deleted from storage after the
-verification decision is recorded. The `deleted_from_storage_at` column
-tracks compliance with this privacy commitment.
+**Purpose:** References to document files uploaded to private Supabase Storage (`verification-docs` bucket) for verification.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `verification_record_id` | `UUID` | NO | — | FK to `verification_records.id`. |
-| `storage_path` | `TEXT` | NO | — | Path in Supabase Storage bucket. Service role only. |
-| `document_type` | `TEXT` | NO | — | Enum: `utility_bill`, `rental_agreement`, `society_card`, `delivery_confirmation`, `other`. |
-| `file_name` | `TEXT` | NO | — | Original filename as uploaded. |
-| `file_size_bytes` | `INTEGER` | NO | — | File size. Reject uploads over 10MB at application layer. |
-| `mime_type` | `TEXT` | NO | — | Must be `image/jpeg`, `image/png`, or `application/pdf`. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `verification_record_id`| `UUID` | NO | — | FK to `verification_records.id`. |
+| `storage_path` | `TEXT` | NO | — | Path in `verification-documents` private bucket. |
+| `document_type` | `TEXT` | NO | — | Type: `'utility_bill'`, `'rental_agreement'`, `'society_card'`, etc. |
+| `file_size_bytes` | `INTEGER` | YES | NULL | File size in bytes. |
 | `uploaded_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `deleted_from_storage_at` | `TIMESTAMPTZ` | YES | NULL | When the file was deleted from storage. NULL means still present. |
-
-**Constraints:**
-- `CHECK (document_type IN ('utility_bill', 'rental_agreement', 'society_card', 'delivery_confirmation', 'other'))`
-- `CHECK (mime_type IN ('image/jpeg', 'image/png', 'application/pdf'))`
-- `CHECK (file_size_bytes > 0 AND file_size_bytes <= 10485760)` — 10MB max.
+| `deleted_from_storage_at`| `TIMESTAMPTZ`| YES | NULL | When deleted (enforces privacy cleanup). |
 
 **Indexes:**
-- `idx_vd_verification_record_id` on `(verification_record_id)`
-- `idx_vd_pending_deletion` on `(deleted_from_storage_at)`
-  where `deleted_from_storage_at IS NULL`
-  — used by the cleanup job to find documents awaiting deletion.
+- `idx_vd_record` on `(verification_record_id)`
+- `idx_vd_undeleted` on `(deleted_from_storage_at)` where `deleted_from_storage_at IS NULL`
 
 **RLS Policies:**
-- All operations: service role only. Users never access this table directly.
+- All operations are service role only. regular users cannot query or access document records directly.
+
+> [!NOTE]
+> - **file_name** and **mime_type**: Originally planned as columns. In the active backend, these metadata values are handled directly in the storage headers rather than stored as redundant database columns.
 
 ---
 
 ### 2.6 `anchor_roles`
 
-**Purpose:** Tracks current and historical anchor assignments per
-neighborhood. One active anchor per neighborhood at any time.
+**Purpose:** Tracks current and historical anchor assignments per neighborhood.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `user_id` | `UUID` | NO | — | FK to `users.id`. The anchor. |
-| `membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. Anchor must be a verified member. |
-| `term_start` | `TIMESTAMPTZ` | NO | `now()` | Term start. |
-| `term_end` | `TIMESTAMPTZ` | NO | — | Calculated as `term_start + interval '6 months'`. |
-| `is_active` | `BOOLEAN` | NO | `true` | Only one active anchor per neighborhood. |
+| `user_id` | `UUID` | NO | — | FK to `users.id`. |
+| `member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
+| `term_started_at` | `TIMESTAMPTZ` | NO | `now()` | Anchor term start. |
+| `term_ends_at` | `TIMESTAMPTZ` | NO | `now() + 6 months`| Anchor term end. |
+| `is_active` | `BOOLEAN` | NO | `true` | True if this is the active anchor. |
+| `renewed_count` | `INTEGER` | NO | `0` | Count of times term renewed. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `deactivated_at` | `TIMESTAMPTZ` | YES | NULL | When anchor role was ended (term expiry or removal). |
 
 **Constraints:**
-- `UNIQUE (neighborhood_id) WHERE is_active = true`
-  — enforces one active anchor per neighborhood.
-- `CHECK (term_end > term_start)`
-- Anchor must be Tier 2+ member — enforced at application layer on insert.
+- `UNIQUE (neighborhood_id) WHERE is_active = true` (enforces single active anchor).
 
 **Indexes:**
-- `idx_anchor_neighborhood_active` on `(neighborhood_id)` where `is_active = true`
-- `idx_anchor_user_id` on `(user_id)`
+- `idx_anchor_neighborhood` on `(neighborhood_id)`
+- `idx_anchor_user` on `(user_id)`
 
 **RLS Policies:**
-- `SELECT`: Any member of the neighborhood can read the active anchor record
-  (to see who the anchor is). Historical (inactive) records: service role only.
-- `INSERT`: Service role only.
-- `UPDATE`: Service role only.
-- `DELETE`: Not permitted.
+- `SELECT`: Any member of the neighborhood can read the active anchor record. Historical records are service role only.
+- `INSERT`/`UPDATE`: Service role only.
+
+> [!NOTE]
+> - **membership_id**: Renamed to `member_id`.
+> - **term_start** and **term_end**: Renamed to `term_started_at` and `term_ends_at`.
+> - **deactivated_at**: Inactive anchor records are managed via `is_active = false` instead of a separate timestamp column.
 
 ---
 
 ### 2.7 `anchor_actions_log`
 
-**Purpose:** Immutable audit log of every action taken by an anchor in their
-moderation capacity. Append-only — no updates, no deletes, ever.
+**Purpose:** Immutable audit log of all anchor actions. Append-only.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `anchor_role_id` | `UUID` | NO | — | FK to `anchor_roles.id`. |
-| `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. Denormalized for query performance. |
+| `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
+| `actor_user_id` | `UUID` | NO | — | FK to `users.id` (anchor user performing action). |
 | `action_type` | `anchor_action_type` | NO | — | ENUM: `post_removed`, `post_pinned`, `post_unpinned`, `member_flagged`, `escalation_created`, `vouching_initiated`, `vouching_completed`, `vouching_rejected`, `dismiss_report`. |
-| `target_post_id` | `UUID` | YES | NULL | FK to `posts.id`. Populated when action targets a post. |
-| `target_member_id` | `UUID` | YES | NULL | FK to `neighborhood_members.id`. Populated when action targets a member. |
-| `metadata` | `JSONB` | YES | NULL | Additional context (e.g. removal reason, report resolution). |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Immutable timestamp. |
-
-**Constraints:**
-- `action_type` references the `anchor_action_type` ENUM — no CHECK constraint needed.
-- No UPDATE or DELETE permitted — enforced via RLS and application layer.
+| `target_post_id` | `UUID` | YES | NULL | FK to `posts.id`. |
+| `target_member_id` | `UUID` | YES | NULL | FK to `neighborhood_members.id`. |
+| `metadata` | `JSONB` | YES | NULL | Action details. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Log creation. |
 
 **Indexes:**
-- `idx_aal_neighborhood_id` on `(neighborhood_id, created_at DESC)`
-- `idx_aal_anchor_role_id` on `(anchor_role_id)`
-- `idx_aal_target_id` on `(target_id)`
+- `idx_aal_anchor` on `(anchor_role_id)`
+- `idx_aal_neighborhood` on `(neighborhood_id)`
+- `idx_aal_actor` on `(actor_user_id)`
+- `idx_aal_created` on `(created_at DESC)`
 
 **RLS Policies:**
-- `SELECT`: Service role only. Anchor action logs are internal — not
-  exposed to members or the anchor themselves via user-facing queries.
-- `INSERT`: Service role only.
-- `UPDATE`: Not permitted (enforced via RLS).
-- `DELETE`: Not permitted (enforced via RLS).
+- Service role only. Regular users cannot query this table.
 
 ---
 
 ### 2.8 `posts`
 
-**Purpose:** Every content item published to a neighborhood feed. Emergency
-alerts are posts with `ai_classification = 'emergency'` or
-`category IN ('power', 'security', 'infrastructure', 'water')` and
-`is_emergency = true`.
+**Purpose:** Stores all posts and alerts on the dynamic neighborhood feed.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `author_id` | `UUID` | NO | — | FK to `users.id`. |
-| `membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. Captures tier at time of posting. |
-| `content` | `TEXT` | NO | — | Post body. Min 2 chars, max 1000 chars. |
-| `category` | `TEXT` | NO | — | User-selected: `power`, `security`, `infrastructure`, `water`, `general`. |
-| `ai_classification` | `TEXT` | YES | NULL | AI output: `emergency`, `community`, `general`. Null until classified. |
-| `ai_classification_confidence` | `DECIMAL(4,3)` | YES | NULL | Confidence score 0.000–1.000. |
-| `ai_classified_at` | `TIMESTAMPTZ` | YES | NULL | When classification completed. |
-| `is_emergency` | `BOOLEAN` | NO | `false` | True if AI classifies as emergency OR anchor overrides to emergency. |
-| `is_pinned` | `BOOLEAN` | NO | `false` | True if `is_emergency = true` and not yet resolved. |
-| `is_resolved` | `BOOLEAN` | NO | `false` | True when marked resolved by author or anchor. |
-| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | When resolved. |
-| `resolved_by` | `UUID` | YES | NULL | FK to `users.id`. Who resolved it. |
-| `moderated_at` | `TIMESTAMPTZ` | YES | NULL | When anchor removed or acted on this post. |
-| `moderated_by` | `UUID` | YES | NULL | FK to `users.id` (anchor). |
-| `moderation_action` | `TEXT` | YES | NULL | Enum: `removed`, `classification_overridden`. |
-| `language_detected` | `TEXT` | YES | NULL | `en`, `ur`, `mixed`. Detected at classification time. |
+| `author_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id` (author). |
+| `body` | `TEXT` | NO | — | Post body text. Max 500 chars. |
+| `body_language` | `TEXT` | NO | `'en'` | Detected language: `'en'`, `'ur'`, or `'mixed'`. |
+| `category` | `post_category` | NO | `'general'`| ENUM: `power`, `security`, `infrastructure`, `water`, `general`. |
+| `is_emergency` | `BOOLEAN` | NO | `false` | True if classified as an emergency. |
+| `ai_confidence` | `NUMERIC(4,3)`| YES | NULL | Score from Gemini classifier. |
+| `is_resolved` | `BOOLEAN` | NO | `false` | True if marked resolved by author/anchor. |
+| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | Resolution time. |
+| `resolved_by_member_id`| `UUID`| YES | NULL | FK to `neighborhood_members.id`. |
+| `is_pinned` | `BOOLEAN` | NO | `false` | True if emergency and pinned at top. |
+| `is_removed` | `BOOLEAN` | NO | `false` | Soft-deleted flag. |
+| `removed_at` | `TIMESTAMPTZ` | YES | NULL | Soft-deletion timestamp. |
+| `removed_by_anchor_id`| `UUID` | YES | NULL | FK to `anchor_roles.id`. |
+| `removal_reason` | `TEXT` | YES | NULL | Anchor's removal reason notes. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Maintained by trigger. |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete (anchor removal). |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | trigger-maintained. |
+| `ai_civic_signal` | `TEXT` | YES | NULL | Summarized civic signal (AI generated). Added via migration. |
 
 **Constraints:**
-- `CHECK (char_length(content) >= 2 AND char_length(content) <= 1000)`
+- `CHECK (char_length(body) >= 2 AND char_length(body) <= 1000)`
 - `CHECK (category IN ('power', 'security', 'infrastructure', 'water', 'general'))`
-- `CHECK (ai_classification IN ('emergency', 'community', 'general') OR ai_classification IS NULL)`
-- `CHECK (moderation_action IN ('removed', 'classification_overridden') OR moderation_action IS NULL)`
-- `CHECK (NOT (is_resolved = true AND resolved_at IS NULL))` — resolved must have timestamp.
-- `CHECK (ai_classification_confidence IS NULL OR (ai_classification_confidence >= 0 AND ai_classification_confidence <= 1))`
 
 **Indexes:**
-- `idx_posts_neighborhood_feed` on `(neighborhood_id, created_at DESC)`
-  where `deleted_at IS NULL` — primary feed query index.
-- `idx_posts_emergency` on `(neighborhood_id, is_emergency, is_pinned)`
-  where `deleted_at IS NULL AND is_emergency = true` — emergency pin query.
-- `idx_posts_author` on `(author_id)` where `deleted_at IS NULL`
-- `idx_posts_unclassified` on `(created_at)` where `ai_classified_at IS NULL AND deleted_at IS NULL`
-  — used by background classification worker to find posts awaiting AI processing.
+- `idx_posts_neighborhood` on `(neighborhood_id, created_at DESC)`
+- `idx_posts_emergency` on `(neighborhood_id, is_emergency, created_at DESC)` where `is_emergency = true AND is_removed = false`
+- `idx_posts_active` on `(neighborhood_id, is_removed, created_at DESC)` where `is_removed = false`
 
 **RLS Policies:**
-- `SELECT`: Members of the neighborhood can read non-deleted posts.
-  Tier 1 members can read (feed browsing is a Tier 1 capability).
-- `INSERT`: Tier 2+ members only. Enforced via RLS check on
-  `neighborhood_members.tier >= 2` for the posting user's membership.
-- `UPDATE`: Authors can update `is_resolved` and `resolved_at` on their
-  own posts. Anchors (via service role) can update moderation fields.
-  No user can update `ai_classification` directly.
-- `DELETE`: Not permitted. Soft delete via `deleted_at`.
+- `SELECT`: Members of the neighborhood can read active (non-removed) posts (includes Tier 1).
+- `INSERT`: Requires Tier 2+ membership check on the posting user.
+- `UPDATE`: Original author can update resolution fields. Anchor role can update moderation fields.
+- `DELETE`: Not permitted. Soft delete via `is_removed = true`.
+
+> [!NOTE]
+> - **content**: Renamed to `body`.
+> - **author_id** and **membership_id**: Replaced by `author_member_id` to refer to the neighborhood member record directly.
+> - **ai_classification**: User categories are overridden directly in the `category` column when AI confidence is high, rather than storing them in a separate column.
+> - **deleted_at**: Soft deletes are handled via the combination of `is_removed = true`, `removed_at`, and `removed_by_anchor_id` rather than a single `deleted_at` timestamp.
 
 ---
 
 ### 2.9 `post_reports`
 
-**Purpose:** Tracks member-initiated reports against posts for the anchor
-moderation queue. Unlike moderation_escalations (which tracks disputes
-against anchor actions for the 20% threshold), post_reports is the "inbox"
-of content the anchor must review. A Tier 2+ member can report a post they
-find concerning; the community anchor reviews and either removes the post
-or dismisses the report.
+**Purpose:** Tracks member reports against feed posts for anchor moderation.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `post_id` | `UUID` | NO | — | FK to `posts.id`. The reported post. |
-| `reporter_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. Who reported it. |
-| `reason` | `TEXT` | NO | — | Free-text reason. Max 300 chars (CHECK constraint). |
-| `status` | `TEXT` | NO | `'open'` | Enum: `open` (awaiting review), `resolved` (post removed), `dismissed` (no action needed). |
-| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | When the anchor actioned this report. |
-| `resolved_by_action` | `TEXT` | YES | NULL | `removed` or `dismissed` — mirrors the status. |
-| `resolved_by_anchor_role_id` | `UUID` | YES | NULL | FK to `anchor_roles.id`. Which anchor actioned it. |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | When the report was filed. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `post_id` | `UUID` | NO | — | FK to `posts.id`. |
+| `reporter_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
+| `reason` | `TEXT` | NO | — | Text reason. Max 300 chars. |
+| `status` | `TEXT` | NO | `'open'` | Status ENUM: `'open'`, `'resolved'`, `'dismissed'`. |
+| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | Decision timestamp. |
+| `resolved_by_action` | `TEXT` | YES | NULL | Action taken: `'removed'` or `'dismissed'`. |
+| `resolved_by_anchor_role_id`| `UUID`| YES | NULL | FK to `anchor_roles.id`. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Report timestamp. |
 
 **Constraints:**
-- `UNIQUE (post_id, reporter_member_id) WHERE status = 'open'`
-  — one open report per member per post (prevents spam-flooding).
+- `UNIQUE (post_id, reporter_member_id) WHERE status = 'open'` (prevent spam)
 - `CHECK (char_length(reason) >= 1 AND char_length(reason) <= 300)`
-- `CHECK (status IN ('open', 'resolved', 'dismissed'))`
-- `CHECK (resolved_by_action IS NULL OR resolved_by_action IN ('removed', 'dismissed'))`
 
 **Indexes:**
-- `idx_pr_post_id` on `(post_id)` — used by anchor to list reports per post.
+- `idx_pr_neighborhood_post` on `(post_id)`
 - `idx_pr_reporter` on `(reporter_member_id)`
-- `idx_pr_status` on `(status)` where `status = 'open'` — anchor's moderation queue.
+- `idx_pr_status` on `(status)` where `status = 'open'`
 
 **RLS Policies:**
-- `SELECT`: Reporting member can read their own reports. The neighborhood
-  anchor can read all open reports for their neighborhood's posts.
-- `INSERT`: Tier 2+ members can insert. Verifies reporter belongs to
-  authenticated user with tier >= tier_2 in the post's neighborhood.
-- `UPDATE`: Only the anchor can update a report (resolve or dismiss).
+- `SELECT`: Reporter can read own; Anchor can read open reports in their neighborhood.
+- `INSERT`: Tier 2+ members can create.
+- `UPDATE`: Anchor only.
 
 ---
 
-### 2.10 `tier3_vouching_requests`
+### 2.10 `vouching_requests`
 
-**Purpose:** Tracks Tier 3 vouching requests requiring two co-signatures
-(anchor + one other verified member).
+**Purpose:** Tracks Tier 3 vouching requests (anchor + member co-signatures).
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
-| `candidate_user_id` | `UUID` | NO | — | FK to `users.id`. User requesting Tier 3. |
-| `candidate_membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `anchor_signed` | `BOOLEAN` | NO | `false` | True when the anchor has co-signed. |
-| `anchor_signed_at` | `TIMESTAMPTZ` | YES | NULL | When anchor signed. |
-| `anchor_user_id` | `UUID` | YES | NULL | FK to `users.id`. Which anchor signed. |
-| `cosigner_signed` | `BOOLEAN` | NO | `false` | True when the second member has co-signed. |
-| `cosigner_signed_at` | `TIMESTAMPTZ` | YES | NULL | When second member signed. |
-| `cosigner_user_id` | `UUID` | YES | NULL | FK to `users.id`. Which member co-signed. |
-| `status` | `TEXT` | NO | `'pending'` | Enum: `pending`, `approved`, `rejected`, `expired`. |
-| `approved_at` | `TIMESTAMPTZ` | YES | NULL | When both signatures completed and tier upgraded. |
-| `expires_at` | `TIMESTAMPTZ` | NO | — | 30 days from creation. Request expires if not completed. |
+| `candidate_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id` (vouch target). |
+| `initiated_by_anchor_id`| `UUID` | NO | — | FK to `anchor_roles.id` (initiating anchor). |
+| `cosigner_member_id` | `UUID` | YES | NULL | FK to `neighborhood_members.id` (second cosigner). |
+| `anchor_signed_at` | `TIMESTAMPTZ` | NO | `now()` | Timestamp anchor signed/initiated. |
+| `cosigner_signed_at` | `TIMESTAMPTZ` | YES | NULL | Timestamp second member co-signed. |
+| `is_completed` | `BOOLEAN` | NO | `false` | True when fully vouch-approved (2 signatures). |
+| `is_rejected` | `BOOLEAN` | NO | `false` | True if explicitly rejected. |
+| `rejection_reason` | `TEXT` | YES | NULL | Rejection details. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Maintained by trigger. |
+| `expires_at` | `TIMESTAMPTZ` | NO | `now() + 7 days`| Expiry timeline. |
 
 **Constraints:**
-- `CHECK (status IN ('pending', 'approved', 'rejected', 'expired'))`
 - `CHECK (expires_at > created_at)`
-- `CHECK (anchor_user_id != cosigner_user_id OR cosigner_user_id IS NULL)`
-  — anchor and co-signer cannot be the same person.
-- `CHECK (anchor_user_id != candidate_user_id OR anchor_user_id IS NULL)`
-  — anchor cannot vouch for themselves.
-- One active pending request per user per neighborhood — enforced at
-  application layer.
+- `CHECK (initiated_by_anchor_id != cosigner_member_id)`
 
 **Indexes:**
-- `idx_t3vr_neighborhood_pending` on `(neighborhood_id, status)`
-  where `status = 'pending'`
-- `idx_t3vr_candidate` on `(candidate_user_id)`
+- `idx_vr_candidate` on `(candidate_member_id)`
+- `idx_vr_neighborhood` on `(neighborhood_id)`
+- `idx_vouch_pending` on `(is_completed, is_rejected, expires_at)` where `is_completed = false and is_rejected = false`
 
 **RLS Policies:**
-- `SELECT`: The candidate can see their own request. The anchor of the
-  neighborhood can see all pending requests. Verified members can see
-  requests where they are the cosigner.
-- `INSERT`: Service role only. Request initiated via backend endpoint.
-- `UPDATE`: Service role only.
-- `DELETE`: Not permitted.
+- `SELECT`: Candidate user, active anchor, and assigned co-signer can read.
+- `INSERT`/`UPDATE`: Service role only.
+
+> [!NOTE]
+> - **Table Name**: The original design spec referenced this table as `tier3_vouching_requests`. The database implementation uses the name `vouching_requests`.
+> - **status**: Originally designed as a status string ENUM. Mapped in the database using the boolean combinations of `is_completed` and `is_rejected`.
+> - **user columns**: Point to membership ids (`candidate_member_id`, `cosigner_member_id`) instead of user ids (`candidate_user_id`, `cosigner_user_id`).
 
 ---
 
 ### 2.11 `worker_listings`
 
-**Purpose:** Service worker profiles visible in the neighborhood directory.
-Listings-only — no transactions or payment data.
+**Purpose:** Directory entries for community service workers.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `submitted_by` | `UUID` | NO | — | FK to `users.id`. Member who added this listing. |
-| `worker_name` | `TEXT` | NO | — | Name of the worker. Max 80 chars. |
-| `category` | `TEXT` | NO | — | Enum: `electrician`, `plumber`, `maid`, `cook`, `driver`, `other`. |
-| `description` | `TEXT` | YES | NULL | Brief description. Max 300 chars. |
-| `contact_phone` | `TEXT` | YES | NULL | Worker's contact number. Visible to Tier 2+ only (RLS). |
-| `is_verified_badge` | `BOOLEAN` | NO | `false` | True when badge criteria met (5+ confirmed jobs, 4.0+ avg). |
-| `confirmed_job_count` | `INTEGER` | NO | `0` | Count of confirmed completed jobs. Updated by trigger. |
-| `average_rating` | `DECIMAL(3,2)` | YES | NULL | Average review score (1.00–5.00). Updated by trigger. |
-| `is_promoted` | `BOOLEAN` | NO | `false` | True for paid promoted listing. Appears labeled in directory. |
+| `created_by_member_id`| `UUID` | NO | — | FK to `neighborhood_members.id` (recommender). |
+| `worker_name` | `TEXT` | NO | — | Name of worker. |
+| `worker_phone` | `TEXT` | YES | NULL | Phone number (shown only to Tier 2+). |
+| `service_type` | `TEXT` | NO | — | Category: `'electrician'`, `'plumber'`, `'maid'`, `'driver'`, `'cook'`, etc. |
+| `description` | `TEXT` | YES | NULL | Description notes. Max 300 chars. |
+| `is_promoted` | `BOOLEAN` | NO | `false` | Directory promoting toggle. |
+| `earned_badge` | `worker_badge_status`| NO|`'none'`| Badge ENUM: `'none'`, `'earning'`, `'earned'`. |
+| `min_completed_jobs` | `INTEGER` | NO | `0` | Count of jobs completed. |
+| `avg_rating` | `NUMERIC(3,2)`| YES | NULL | Average review score. |
+| `status` | `listing_status`| NO | `'active'` | Status: `'active'`, `'suspended'`, etc. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | Maintained by trigger. |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete. |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | trigger-maintained. |
 
 **Constraints:**
-- `CHECK (category IN ('electrician', 'plumber', 'maid', 'cook', 'driver', 'other'))`
 - `CHECK (char_length(worker_name) >= 2 AND char_length(worker_name) <= 80)`
-- `CHECK (confirmed_job_count >= 0)`
-- `CHECK (average_rating IS NULL OR (average_rating >= 1.00 AND average_rating <= 5.00))`
-- Badge criteria enforced by trigger: `is_verified_badge` = true only when
-  `confirmed_job_count >= 5 AND average_rating >= 4.00`.
 
 **Indexes:**
-- `idx_wl_neighborhood_category` on `(neighborhood_id, category)` where `deleted_at IS NULL`
-- `idx_wl_verified_badge` on `(neighborhood_id, is_verified_badge)` where `deleted_at IS NULL`
+- `idx_wl_neighborhood` on `(neighborhood_id, status)`
+- `idx_wl_service_type` on `(neighborhood_id, service_type)`
 
 **RLS Policies:**
-- `SELECT`: All members can see listings excluding `contact_phone`.
-  Tier 2+ members can see `contact_phone`. Implemented via a view
-  `worker_listings_public` that omits `contact_phone` for Tier 1 members.
-- `INSERT`: Tier 2+ members can add listings.
-- `UPDATE`: Submitted-by user can update their own listing fields except
-  `is_verified_badge`, `confirmed_job_count`, `average_rating` (computed).
-  Service role updates computed fields.
-- `DELETE`: Not permitted. Soft delete via `deleted_at`.
+- `SELECT`: All members can see listings (excluding `worker_phone`). Tier 2+ members can see `worker_phone` (implemented via public view overlay).
+- `INSERT`: Tier 2+ members can add.
+- `UPDATE`: Owner who recommended the worker can update basic details.
+
+> [!NOTE]
+> - **submitted_by**: Renamed to `created_by_member_id`.
+> - **contact_phone** and **category**: Renamed to `worker_phone` and `service_type`.
+> - **is_verified_badge**: Replaced by `earned_badge` (ENUM) to track granular badge progression ('none', 'earning', 'earned').
+> - **confirmed_job_count** and **average_rating**: Renamed to `min_completed_jobs` and `avg_rating`.
+> - **deleted_at**: Managed using `status = 'suspended'`.
 
 ---
 
 ### 2.12 `worker_reviews`
 
-**Purpose:** Reviews of service workers. Gated by job confirmation — both
-member and worker (confirmed by member on worker's behalf at prototype stage)
-must confirm the job before a review is unlocked.
+**Purpose:** Reviews of recommended workers.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `listing_id` | `UUID` | NO | — | FK to `worker_listings.id`. |
-| `reviewer_id` | `UUID` | NO | — | FK to `users.id`. |
-| `reviewer_membership_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
-| `rating` | `INTEGER` | NO | — | 1 to 5. |
-| `review_text` | `TEXT` | YES | NULL | Optional written review. Max 500 chars. |
-| `job_confirmed` | `BOOLEAN` | NO | `false` | True when job confirmed — review only submittable when true. |
-| `job_confirmed_at` | `TIMESTAMPTZ` | YES | NULL | When job was confirmed. |
+| `reviewer_member_id` | `UUID` | NO | — | FK to `neighborhood_members.id`. |
+| `job_confirmed_by_worker`| `BOOLEAN`| NO | `false` | Confirmation status from worker. |
+| `job_confirmed_by_member`| `BOOLEAN`| NO | `false` | Confirmation status from member. |
+| `rating` | `SMALLINT` | YES | NULL | Review rating (1 to 5). |
+| `review_body` | `TEXT` | YES | NULL | Optional written review. Max 500 chars. |
+| `is_published` | `BOOLEAN` | NO | `false` | True when both parties have confirmed. |
 | `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
-| `deleted_at` | `TIMESTAMPTZ` | YES | NULL | Soft delete. |
+| `published_at` | `TIMESTAMPTZ` | YES | NULL | Publishing timestamp. |
 
 **Constraints:**
-- `UNIQUE (listing_id, reviewer_id) WHERE deleted_at IS NULL`
-  — one review per member per worker listing.
-- `CHECK (rating >= 1 AND rating <= 5)`
-- `CHECK (NOT (job_confirmed = false AND review_text IS NOT NULL))`
-  — review content only settable after job confirmation. Enforced at
-  application layer; this constraint catches direct DB inserts.
+- `UNIQUE (listing_id, reviewer_member_id)` (one review per member per worker)
+- `CHECK (rating BETWEEN 1 AND 5)`
 
 **Indexes:**
-- `idx_wr_listing_id` on `(listing_id)` where `deleted_at IS NULL`
-- `idx_wr_reviewer_id` on `(reviewer_id)`
+- `idx_wr_listing` on `(listing_id, is_published)`
+- `idx_wr_reviewer` on `(reviewer_member_id)`
 
 **RLS Policies:**
-- `SELECT`: All neighborhood members can read reviews for listings in
-  their neighborhood.
-- `INSERT`: Tier 2+ members can insert a review only if `job_confirmed = true`.
-  Enforced via RLS policy checking the `job_confirmed` field on insert.
-- `UPDATE`: Reviewer can update their own review text and rating while
-  `job_confirmed = true`. Cannot update `job_confirmed` or `listing_id`.
-- `DELETE`: Not permitted. Soft delete via `deleted_at`.
+- `SELECT`: All members of neighborhood can read published reviews.
+- `INSERT`/`UPDATE`: Reviewer can write if `job_confirmed` conditions met.
 
-**Trigger:** On INSERT or UPDATE, recalculate `worker_listings.average_rating`
-and `worker_listings.confirmed_job_count` and update `worker_listings.is_verified_badge`.
+> [!NOTE]
+> - **reviewer_id** and **reviewer_membership_id**: Unified into a single FK `reviewer_member_id` to refer to the member profile directly.
+> - **review_text**: Renamed to `review_body`.
+> - **job_confirmed**: Replaced by `job_confirmed_by_worker` and `job_confirmed_by_member` to implement the required two-party confirmation rules.
 
 ---
 
 ### 2.13 `civic_dashboard_snapshots`
 
-**Purpose:** Pre-computed aggregates for the civic dashboard. Snapshots are
-generated nightly (and on-demand via the export endpoint) by the FastAPI
-background task. The dashboard reads from snapshots, not from live post data,
-for performance.
+**Purpose:** Pre-computed aggregates for the neighborhood dashboard.
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
-| `id` | `UUID` | NO | `gen_random_uuid()` | Primary key. |
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
 | `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
-| `period_days` | `INTEGER` | NO | — | Period this snapshot covers: 7, 30, or 90. |
-| `snapshot_date` | `DATE` | NO | — | The date this snapshot was computed (UTC date). |
-| `total_posts` | `INTEGER` | NO | `0` | Total non-deleted posts in period. |
-| `emergency_posts` | `INTEGER` | NO | `0` | Posts with `is_emergency = true`. |
-| `resolved_posts` | `INTEGER` | NO | `0` | Posts with `is_resolved = true`. |
-| `power_count` | `INTEGER` | NO | `0` | Posts with `category = 'power'`. |
-| `security_count` | `INTEGER` | NO | `0` | Posts with `category = 'security'`. |
-| `infrastructure_count` | `INTEGER` | NO | `0` | Posts with `category = 'infrastructure'`. |
-| `water_count` | `INTEGER` | NO | `0` | Posts with `category = 'water'`. |
-| `general_count` | `INTEGER` | NO | `0` | Posts with `category = 'general'`. |
-| `power_resolved` | `INTEGER` | NO | `0` | Power posts that are resolved. |
-| `security_resolved` | `INTEGER` | NO | `0` | Security posts that are resolved. |
-| `infrastructure_resolved` | `INTEGER` | NO | `0` | Infrastructure posts that are resolved. |
-| `water_resolved` | `INTEGER` | NO | `0` | Water posts that are resolved. |
-| `active_members` | `INTEGER` | NO | `0` | Tier 2+ members who posted at least once in the period. |
-| `export_text` | `TEXT` | YES | NULL | Pre-formatted plain text summary for the export button. |
-| `created_at` | `TIMESTAMPTZ` | NO | `now()` | When this snapshot was computed. |
+| `period_start` | `DATE` | NO | — | Start date of covered period. |
+| `period_end` | `DATE` | NO | — | End date of covered period. |
+| `period_type` | `TEXT` | NO | — | Period type: `'7d'`, `'30d'`, or `'90d'`. |
+| `total_posts` | `INTEGER` | NO | `0` | Total posts in period. |
+| `emergency_posts` | `INTEGER` | NO | `0` | Emergency posts in period. |
+| `resolved_posts` | `INTEGER` | NO | `0` | Resolved posts in period. |
+| `category_breakdown` | `JSONB` | NO | `'{}'::jsonb`| Count mapping per category (JSONB format). |
+| `active_members` | `INTEGER` | NO | `0` | Active members in period. |
+| `computed_at` | `TIMESTAMPTZ` | NO | `now()` | Snapshot computation timestamp. |
 
 **Constraints:**
-- `UNIQUE (neighborhood_id, period_days, snapshot_date)`
-  — one snapshot per neighborhood per period per day.
-- `CHECK (period_days IN (7, 30, 90))`
-- `CHECK (total_posts >= 0)` and all count columns >= 0.
+- `UNIQUE (neighborhood_id, period_type, period_start)`
+- `CHECK (period_type IN ('7d', '30d', '90d'))`
 
 **Indexes:**
-- `idx_cds_neighborhood_period` on `(neighborhood_id, period_days, snapshot_date DESC)`
-  — primary dashboard query: latest snapshot for a neighborhood and period.
+- `idx_cds_neighborhood` on `(neighborhood_id, period_type, period_start DESC)`
 
 **RLS Policies:**
-- `SELECT`: Tier 2+ members of the neighborhood can read snapshots.
-  Tier 1 members cannot access the civic dashboard.
-- `INSERT`: Service role only (background task).
-- `UPDATE`: Service role only.
-- `DELETE`: Not permitted.
+- `SELECT`: Tier 2+ neighborhood members can read. Tier 1 users blocked.
+- `INSERT`/`UPDATE`: Service role only.
+
+> [!NOTE]
+> - **period_days** and **snapshot_date**: Mapped in the database to `period_type` and explicit range boundary fields `period_start`/`period_end`.
+> - **count columns**: Individual columns (`power_count`, `security_count`, etc.) are replaced by the flexible `category_breakdown` JSONB object, making schema upgrades for new post categories unnecessary.
+> - **export_text**: Removed from database. Export texts are constructed dynamically on-the-fly by backend service layers (`dashboard_service.py`) during user request.
 
 ---
 
+### 2.14 `notifications`
+
+**Purpose:** Persisted notification records.
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `user_id` | `UUID` | NO | — | FK to `users.id`. |
+| `neighborhood_id` | `UUID` | YES | NULL | FK to `neighborhoods.id`. |
+| `type` | `notification_type` | NO | — | ENUM: `verification_approved`, `verification_rejected`, `emergency_alert`, etc. |
+| `title` | `TEXT` | NO | — | Display title. |
+| `body` | `TEXT` | NO | — | Notification body message. |
+| `deep_link` | `TEXT` | YES | NULL | Deep link schemes (e.g. `halqa://verification/result?status=approved`). |
+| `is_read` | `BOOLEAN` | NO | `false` | Read toggle. |
+| `push_sent_at` | `TIMESTAMPTZ` | YES | NULL | When push was dispatched. |
+| `push_failed` | `BOOLEAN` | NO | `false` | Dispatch failure indicator. |
+| `read_at` | `TIMESTAMPTZ` | YES | NULL | Read timestamp. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | — |
+| `data` | `JSONB` | NO | `'{}'::jsonb`| Metadata payload (deep-link details). Added via migration. |
+
+**Indexes:**
+- `idx_notifications_user` on `(user_id, created_at DESC)`
+- `idx_notifications_unread` on `(user_id, is_read)` where `is_read = false`
+
+**RLS Policies:**
+- `SELECT`/`UPDATE`: User can read and update (mark read) their own notifications.
+
+---
+
+### 2.15 `moderation_escalations`
+
+**Purpose:** Triggered when 20%+ of verified neighborhood members flag/dispute an anchor moderation action.
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | `UUID` | NO | `uuid_generate_v4()` | Primary key. |
+| `neighborhood_id` | `UUID` | NO | — | FK to `neighborhoods.id`. |
+| `anchor_action_id` | `UUID` | NO | — | FK to `anchor_actions_log.id`. |
+| `status` | `escalation_status`| NO| `'open'` | Status: `'open'`, `'under_review'`, `'resolved'`. |
+| `flagged_by_count` | `INTEGER` | NO | `1` | Count of members flags. |
+| `threshold_member_count`| `INTEGER`| NO | — | Member threshold target (snapshot of 20% count). |
+| `resolved_by` | `UUID` | YES | NULL | FK to `users.id` (central moderator). |
+| `resolution_notes` | `TEXT` | YES | NULL | Review notes. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | Creation time. |
+| `resolved_at` | `TIMESTAMPTZ` | YES | NULL | Resolution timestamp. |
+
+**Indexes:**
+- `idx_me_neighborhood` on `(neighborhood_id)`
+- `idx_me_status` on `(status)` where `status in ('open', 'under_review')`
+
+**RLS Policies:**
+- `SELECT`: Active anchor of the neighborhood can read (for escalations display).
+- `INSERT`/`UPDATE`: Service role only.
+
+---
 ## 3. Supabase Storage Buckets
 
 ### 3.1 `verification-docs` (Private)
