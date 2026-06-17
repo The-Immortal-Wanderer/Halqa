@@ -123,20 +123,26 @@ Step 7: Configure Supabase Auth settings.
 
 === PART 3: BACKEND — RENDER DEPLOYMENT ===
 
-The backend is a FastAPI app. Render reads from backend/render.yaml.
+The backend is a FastAPI app. Render configurations are stored in backend/render.yaml.
 
 Step 1: Connect the repository to Render.
 
+   You can deploy the backend to Render in one of two ways:
+
+   Option A: Deploy via Render Blueprints (Recommended)
+   - Go to render.com → New → Blueprint
+   - Connect your GitHub repository
+   - Under "Blueprint Path", set it to: backend/render.yaml
+   - Render will parse the YAML file and spin up the `halqa-api` web service automatically.
+
+   Option B: Deploy manually as a Web Service
    - Go to render.com → New → Web Service
    - Connect your GitHub repository
    - Set Root Directory to: backend
-   - Render will detect render.yaml automatically
-
-   The render.yaml specifies:
-   - Build command: pip install -r requirements.txt
-   - Start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-   - Health check path: /health
-   - Python version: 3.11.0
+   - Set Environment / Runtime to: Python
+   - Set Build Command to: pip install -r requirements.txt
+   - Set Start Command to: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   - Set Health Check Path under Advanced to: /health
 
 Step 2: Set environment variables in Render.
 
@@ -172,7 +178,7 @@ Step 4: Verify the backend is live.
 
    curl https://<your-render-service>.onrender.com/health
 
-   Expected response: {"status":"ok","environment":"production"}
+   Expected response: {"data":{"status":"ok","environment":"production"},"error":null}
 
    If it returns 502: the service is still starting. Render free tier
    instances spin down after 15 minutes of inactivity — first request
@@ -238,15 +244,18 @@ Step 5: Verify the frontend is live.
 Run through these manually after every production deployment.
 
 BACKEND:
-[ ] GET  /health returns {"status":"ok","environment":"production"}
+[ ] GET  /health returns {"data":{"status":"ok","environment":"production"},"error":null}
 [ ] GET  /api/v1/neighborhoods/search?q=green returns Green Valley result
 [ ] POST /api/v1/auth/login with demo.anchor@gmail.com / Demo@987 returns
     a valid access_token
-[ ] GET  /api/v1/posts?neighborhood_id=00000000-0000-0000-0000-000000000001
+[ ] GET  /api/v1/neighborhoods/00000000-0000-0000-0000-000000000001/posts
     returns 5 seed posts
-[ ] GET  /api/v1/dashboard/snapshot?period_type=30d returns snapshot data
-[ ] GET  /api/v1/anchor/status with anchor JWT returns {is_anchor: true}
-[ ] GET  /api/v1/workers?neighborhood_id=... returns worker listings
+[ ] GET  /api/v1/neighborhoods/00000000-0000-0000-0000-000000000001/dashboard?period_type=30d
+    returns snapshot data
+[ ] GET  /api/v1/neighborhoods/00000000-0000-0000-0000-000000000001/anchor/status
+    with anchor JWT returns status data
+[ ] GET  /api/v1/neighborhoods/00000000-0000-0000-0000-000000000001/workers
+    returns worker listings
 
 FRONTEND:
 [ ] / redirects unauthenticated users to /onboarding
