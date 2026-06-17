@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ShieldCheck, PencilSimple } from "@phosphor-icons/react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { verificationApi } from "@/lib/api/verification";
 import { neighborhoodsApi } from "@/lib/api/neighborhoods";
 import { useFeed } from "@/hooks/useFeed";
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default function FeedPage() {
   const params = useParams();
+  const router = useRouter();
   const neighborhoodId = params.neighborhoodId as string;
   const [tier, setTier] = useState<number | "loading">("loading");
   const [filterCategory, setFilterCategory] = useState("");
@@ -53,9 +54,9 @@ export default function FeedPage() {
   const showTier1Banner = tier === 1;
   const canPost = tier !== 1 && tier !== "loading";
 
-  const handlePostTap = useCallback((_post: Post) => {
-    console.log("post detail: not implemented");
-  }, []);
+  const handlePostTap = useCallback((post: Post) => {
+    router.push(`/neighborhood/${neighborhoodId}/posts/${post.id}`);
+  }, [router, neighborhoodId]);
 
   const handlePostCreated = useCallback((_post: Post) => {
     setShowSheet(false);

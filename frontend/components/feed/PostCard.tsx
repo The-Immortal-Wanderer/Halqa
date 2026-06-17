@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import {
@@ -42,6 +43,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function PostCard({ post, onTap, neighborhoodId, showReport = true }: PostCardProps) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -49,9 +51,12 @@ export function PostCard({ post, onTap, neighborhoodId, showReport = true }: Pos
   const isEmergency = post.is_emergency;
 
   const handleTap = useCallback(() => {
-    console.log("post detail: not implemented");
-    onTap?.();
-  }, [onTap]);
+    if (neighborhoodId) {
+      router.push(`/neighborhood/${neighborhoodId}/posts/${post.id}`);
+    } else {
+      onTap?.();
+    }
+  }, [onTap, neighborhoodId, post.id, router]);
 
   return (
     <>

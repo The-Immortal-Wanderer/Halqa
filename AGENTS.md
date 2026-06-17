@@ -411,6 +411,8 @@ status map for any new session.
 | Demo script | Complete — see docs/Demo-Script.txt |
 | Deployment guide | Complete — see docs/Deployment-Guide.txt |
 | Pitch reference document | Complete — see docs/Halqa-Pitch-Reference.txt |
+| Post detail view | Complete |
+| Profile page | Partial — avatar, name, email, tier, neighborhood, sign out built; settings rows are placeholder stubs |
 | Vercel + Render deployment | Not started |
 
 ---
@@ -478,7 +480,8 @@ Three pre-staged accounts for demo walkthrough:
 - Manual review queue UI (OCR 0.40–0.749) — records stay pending
 - Push notifications — simulated via Supabase Realtime (no FCM/APNS)
 - Mobile native app — it is a PWA/web app
-- Profile page — bare stub route
+- Post detail view — implemented (see status table above)
+- Profile page — upgraded from bare stub (avatar, name, email, tier, neighborhood, sign out); settings rows are stubs
 
 **Three demo accounts and their states:**
 

@@ -17,6 +17,23 @@ from app.schemas.common import AuthMember
 logger = logging.getLogger(__name__)
 
 
+async def get_post(
+    db,
+    post_id: UUID,
+    neighborhood_id: UUID,
+) -> PostResponse:
+    """Fetch a single post by ID with author info.
+
+    Raises 404 NOT_FOUND if the post does not exist or belongs to a
+    different neighborhood.
+    """
+    post = await post_repo.get_by_id_with_author(db, post_id, neighborhood_id)
+    if not post:
+        raise api_error(404, ErrorCode.POST_NOT_FOUND, "Post not found")
+    author: dict | None = post.get("author")  # type: ignore[assignment]
+    return _post_to_response(post, author)
+
+
 async def get_feed(
     db,
     neighborhood_id: UUID,

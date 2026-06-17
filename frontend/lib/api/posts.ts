@@ -16,6 +16,9 @@ function buildQuery(params?: {
 }
 
 export const postsApi = {
+  get: (neighborhoodId: string, postId: string) =>
+    apiFetch<Post>(`/neighborhoods/${neighborhoodId}/posts/${postId}`),
+
   list: (
     neighborhoodId: string,
     params?: { category?: string; emergency_only?: boolean; limit?: number },

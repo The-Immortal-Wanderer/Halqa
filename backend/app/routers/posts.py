@@ -22,6 +22,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/neighborhoods/{neighborhood_id}/posts/{post_id}")
+async def get_post(
+    neighborhood_id: UUID = Path(...),
+    post_id: UUID = Path(...),
+    member=Depends(get_current_member),
+    db=Depends(get_db),
+) -> PostAPIResponse:
+    """Get a single post by ID with author info.
+
+    Returns 404 if the post does not exist or belongs to a different
+    neighborhood.
+    """
+    result = await post_service.get_post(db, post_id, neighborhood_id)
+    return PostAPIResponse.ok(data=result)
+
+
 @router.get("/neighborhoods/{neighborhood_id}/posts")
 async def list_posts(
     neighborhood_id: UUID = Path(...),
