@@ -1,6 +1,6 @@
 # Feature Spec: Onboarding
 
-**Status:** Ready for implementation
+**Status:** Complete (June 17, 2026)
 **Depends on:** Authentication wiring (complete), Database migrations (complete)
 **Produces:** The complete new-user flow from app entry to neighborhood feed
 
@@ -269,10 +269,10 @@ Fonts load via next/font — use the CSS variable classes configured in
 
 ## Completion Criteria
 
-- [ ] All 5 screens render without errors
-- [ ] Neighborhood search calls the API and displays results
-- [ ] Full flow: search → confirm → register → membership created → feed
-- [ ] Skip path: verify entry → "Skip for now" → feed with tier_1 banner
-- [ ] Authenticated users landing on `/` redirect to `/feed`
-- [ ] `next build` passes with 0 errors
-- [ ] AGENTS.md "Onboarding feature" → Complete
+- [x] All 5 screens render without errors
+- [x] Neighborhood search calls the API and displays results
+- [x] Full flow: search → confirm → register → membership created → feed
+- [x] Skip path: verify entry → "Skip for now" → feed with tier_1 banner
+- [x] Authenticated users landing on `/` redirect to `/feed`
+- [x] `next build` passes with 0 errors
+- [x] AGENTS.md "Onboarding feature" → Complete

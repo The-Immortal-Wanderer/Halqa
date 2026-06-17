@@ -1,6 +1,6 @@
 # Feature Spec: Anchor Role + Moderation
 
-**Status:** Ready for implementation
+**Status:** Complete (June 17, 2026)
 **Depends on:** Feed (complete), Civic dashboard (complete)
 **Produces:** The community anchor admin interface — moderation queue,
 two-signature vouching, escalation, and audit logging. This is the screen
@@ -317,18 +317,18 @@ default to not rendered, show only after confirmed true).
 
 ## Completion Criteria
 
-- [ ] Demo neighborhood has an active anchor assigned
-- [ ] /anchor route accessible only to the anchor, shows 403 or hides
+- [x] Demo neighborhood has an active anchor assigned
+- [x] /anchor route accessible only to the anchor, shows 403 or hides
       for others
-- [ ] Tab bar shows 6th "Anchor" tab only for the anchor
-- [ ] Moderation queue displays reported posts with working
+- [x] Tab bar shows 6th "Anchor" tab only for the anchor
+- [x] Moderation queue displays reported posts with working
       remove/dismiss actions
-- [ ] Anchor actions write to anchor_actions_log
-- [ ] Escalation logic checks 20% threshold and surfaces escalated
+- [x] Anchor actions write to anchor_actions_log
+- [x] Escalation logic checks 20% threshold and surfaces escalated
       actions in their own section
-- [ ] Vouching queue displays pending requests with sign capability
-- [ ] Two-signature constraint enforced (anchor can be only one signer)
-- [ ] Audit log section displays last 20 actions, collapsible
-- [ ] Report post modal added to PostCard for Tier 2+ members
-- [ ] next build passes with 0 errors
-- [ ] AGENTS.md "Anchor role + moderation" → Complete
+- [x] Vouching queue displays pending requests with sign capability
+- [x] Two-signature constraint enforced (anchor can be only one signer)
+- [x] Audit log section displays last 20 actions, collapsible
+- [x] Report post modal added to PostCard for Tier 2+ members
+- [x] next build passes with 0 errors
+- [x] AGENTS.md "Anchor role + moderation" → Complete

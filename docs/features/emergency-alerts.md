@@ -1,6 +1,6 @@
 # Feature Spec: Emergency Alerts + AI Classification
 
-**Status:** Ready for implementation
+**Status:** Complete (June 17, 2026)
 **Depends on:** Verification flow (complete), Authentication (complete)
 **Produces:** The neighborhood feed with post creation, AI-powered alert
 triage, real-time delivery to verified members, the resolved state, and
@@ -391,18 +391,18 @@ it if needed.
 
 ## Completion Criteria
 
-- [ ] Feed loads with posts in correct order (emergency first, then
+- [x] Feed loads with posts in correct order (emergency first, then
       by time)
-- [ ] Post creation: category selection + body + emergency toggle →
+- [x] Post creation: category selection + body + emergency toggle →
       POST /api/v1/posts → optimistic update in feed
-- [ ] AI classification runs after post creation and updates the post
+- [x] AI classification runs after post creation and updates the post
       (visible via Realtime UPDATE in the feed within a few seconds)
-- [ ] Emergency banner appears when is_emergency post arrives via Realtime
-- [ ] Resolved state: long press → mark resolved → success styling via
+- [x] Emergency banner appears when is_emergency post arrives via Realtime
+- [x] Resolved state: long press → mark resolved → success styling via
       Realtime UPDATE
-- [ ] Tier 1 members see feed read-only (amber banner, no FAB, no post
+- [x] Tier 1 members see feed read-only (amber banner, no FAB, no post
       creation)
-- [ ] Feed filter pills work (category filter, emergency filter)
-- [ ] 5 seed posts visible in the demo neighborhood
-- [ ] next build passes with 0 errors
-- [ ] AGENTS.md "Emergency alerts + AI classification" → Complete
+- [x] Feed filter pills work (category filter, emergency filter)
+- [x] 5 seed posts visible in the demo neighborhood
+- [x] next build passes with 0 errors
+- [x] AGENTS.md "Emergency alerts + AI classification" → Complete

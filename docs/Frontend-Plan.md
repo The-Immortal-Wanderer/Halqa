@@ -19,24 +19,31 @@ references it by name throughout.
 frontend/
 ├── app/                              ← Next.js App Router root
 │   ├── layout.tsx                    ← Root layout: fonts, global styles, auth provider
-│   ├── page.tsx                      ← Root route → redirects to /onboarding or /neighborhood
+│   ├── page.tsx                      ← Root route → membership-aware redirect via getRedirectTarget()
 │   ├── globals.css                   ← Tailwind base, custom CSS properties
+│   ├── loading.tsx                   ← Root loading state (spinner)
+│   ├── not-found.tsx                 ← 404 page
+│   ├── error.tsx                     ← Root error boundary
 │   ├── (auth)/                       ← Route group: unauthenticated screens
 │   │   ├── layout.tsx                ← Auth layout (no tab bar)
 │   │   ├── onboarding/
 │   │   │   ├── page.tsx              ← Screen 1: Entry (Halqa logo + Find neighborhood)
-│   │   │   ├── search/
-│   │   │   │   └── page.tsx          ← Screen 2: Neighborhood search
+│   │   │   ├── find/
+│   │   │   │   └── page.tsx          ← Neighborhood search (used in onboarding flow)
+│   │   │   ├── search/               ← Deprecated directory (empty, superceded by find/)
 │   │   │   ├── confirm/
-│   │   │   │   └── page.tsx          ← Screen 3: Neighborhood confirmation + map
-│   │   │   ├── account/
-│   │   │   │   └── page.tsx          ← Screen 4: Account creation (name, phone, password)
+│   │   │   │   └── page.tsx          ← Neighborhood confirmation + map
+│   │   │   ├── account/              ← Deprecated directory (empty, superceded by register/)
+│   │   │   ├── register/
+│   │   │   │   └── page.tsx          ← Account creation (name, email, password, join neighborhood)
 │   │   │   └── verify/
-│   │   │       ├── page.tsx          ← Screen 5: Verification entry (doc type explainer)
+│   │   │       ├── page.tsx          ← Verification entry (doc type explainer)
 │   │   │       └── result/
 │   │   │           └── page.tsx      ← Verification result (approved / rejected / pending)
+│   │   ├── register/
+│   │   │   └── page.tsx              ← Standalone register page (alternative entry point)
 │   │   └── login/
-│   │       └── page.tsx              ← Returning user: phone + OTP
+│   │       └── page.tsx              ← Returning user: email + password
 │   ├── (app)/                        ← Route group: authenticated + joined screens
 │   │   ├── layout.tsx                ← App layout: tab bar, auth guard
 │   │   └── neighborhood/
@@ -50,12 +57,28 @@ frontend/
 │   │           ├── directory/
 │   │           │   ├── page.tsx      ← Worker directory tab
 │   │           │   └── [listingId]/
-│   │           │       └── page.tsx  ← Worker listing detail
+│   │           │       └── page.tsx  ← Worker listing detail (not yet implemented)
+│   │           ├── workers/          ← Alternative worker directory path
+│   │           │   └── page.tsx
+│   │           ├── posts/
+│   │           │   └── [postId]/
+│   │           │       └── page.tsx  ← Post detail view (Complete)
+│   │           ├── anchor/
+│   │           │   └── page.tsx      ← Anchor moderation tab
 │   │           └── dashboard/
 │   │               └── page.tsx      ← Civic dashboard (Tier 2+)
 │   ├── profile/
-│   │   └── page.tsx                  ← Profile tab (settings, notifications, logout)
-│   └── error.tsx                     ← Root error boundary
+│   │   └── page.tsx                  ← Profile tab (avatar, tier, neighborhood, sign out; settings stubs)
+│   ├── verify/                       ← Top-level verification flow (deep-link entry point)
+│   │   ├── layout.tsx
+│   │   ├── upload/
+│   │   │   └── page.tsx
+│   │   ├── pending/
+│   │   │   └── page.tsx
+│   │   └── result/
+│   │       └── page.tsx
+│   └── deeplink/
+│       └── page.tsx                  ← Deep-link handler (verification notification tap target)
 ├── components/
 │   ├── ui/                           ← Primitive, reusable UI components
 │   │   ├── Button.tsx
@@ -95,11 +118,17 @@ frontend/
 │   │   ├── AnchorQueue.tsx
 │   │   ├── ModerationCard.tsx
 │   │   └── VouchingPanel.tsx
-│   └── neighborhood/
-│       └── NeighborhoodSearchResult.tsx
+│   ├── neighborhood/
+│   │   └── NeighborhoodSearchResult.tsx
+│   └── PwaRegister.tsx               ← Client component: registers PWA service worker
 ├── hooks/
 │   ├── useAuth.ts                    ← Auth state, session, user profile
+│   ├── useAnchorStatus.ts            ← Whether current user is the neighborhood anchor
+│   ├── useCommunity.ts               ← Community/membership data for the community tab
+│   ├── useDashboard.ts               ← Dashboard snapshot data and period selection
+│   ├── useDebounce.ts                ← Debounce hook for search inputs
 │   ├── useFeed.ts                    ← Supabase Realtime subscription
+│   ├── useDirectory.ts               ← Worker directory data and filtering
 │   ├── useNeighborhood.ts            ← Current neighborhood context
 │   ├── useVerification.ts            ← Verification status polling/subscription
 │   ├── usePushNotifications.ts       ← Web Push subscription management
@@ -109,28 +138,33 @@ frontend/
 │   │   ├── client.ts                 ← Browser Supabase client (singleton)
 │   │   └── server.ts                 ← Server-side Supabase client (cookies)
 │   ├── api/
-│   │   ├── client.ts                 ← FastAPI fetch wrapper (adds Bearer token)
+│   │   ├── client.ts                 ← FastAPI fetch wrapper (adds Bearer token, 401 retry)
 │   │   ├── users.ts                  ← /users/* API calls
 │   │   ├── neighborhoods.ts          ← /neighborhoods/* API calls
 │   │   ├── posts.ts                  ← /posts/* API calls
 │   │   ├── verification.ts           ← /verification/* API calls
 │   │   ├── dashboard.ts              ← /dashboard/* API calls
 │   │   ├── workers.ts                ← /workers/* API calls
+│   │   ├── members.ts                ← /members/* API calls
 │   │   └── anchor.ts                 ← /anchor/* API calls
+│   ├── auth/
+│   │   └── getRedirectTarget.ts      ← Membership-aware redirect utility (root + login + verify-skip)
+│   ├── api.ts                        ← Re-exports or shared API utilities
 │   ├── env.ts                        ← Type-safe env var access (no direct process.env)
 │   └── utils.ts                      ← Date formatting, text truncation, classNames helper
 ├── types/
 │   └── index.ts                      ← All shared types from ARCHITECTURE.md Section 4
 ├── public/
 │   ├── manifest.json                 ← PWA manifest
-│   ├── sw.js                         ← Service worker (push notifications + deep links)
+│   ├── sw.js                         ← Service worker (registered; no caching strategy yet)
 │   ├── icons/
 │   │   ├── icon-192.png              ← PWA icon (192×192, sand bg, teal mark)
 │   │   ├── icon-512.png              ← PWA icon (512×512)
 │   │   └── favicon.ico
 │   └── fonts/                        ← Self-hosted fallback (if Google Fonts unavailable)
+├── middleware.ts                     ← @supabase/ssr session check, unauthenticated redirect
 ├── tailwind.config.ts                ← Full design token config (ARCHITECTURE.md Section 8)
-├── next.config.ts
+├── next.config.mjs                   ← Next.js config (ESM format, not .ts)
 ├── tsconfig.json
 └── vercel.json
 ```
@@ -173,8 +207,9 @@ No custom CSS except for:
 - `@keyframes halqa-pulse` for the verification pending animation
 - `@keyframes halqa-fade-in` for post card entrance
 
-### 2.2 `next.config.ts`
+### 2.2 `next.config.mjs`
 
+> **Note:** The config file uses ESM format (`.mjs`), not TypeScript (`.ts`).
 ```typescript
 import type { NextConfig } from 'next'
 

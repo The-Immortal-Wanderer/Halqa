@@ -21,8 +21,9 @@ and generate structured civic intelligence that can be routed to institutions
 **Tagline:** Your neighborhood, organized. / آپ کا حلقہ، منظم۔
 
 **Current scope:** Prototype for the AI for Civic Innovation Hackathon 2026,
-deadline June 13. Prototype only. Features outside scope are documented in
-PRD.md and must not be built without explicit instruction.
+submission deadline June 13, demo/pitch delivered June 17, 2026. Prototype only.
+Features outside scope are documented in PRD.md and must not be built without
+explicit instruction.
 
 ---
 
@@ -388,7 +389,7 @@ Update this section as features are completed. This is the authoritative
 status map for any new session.
 
 | Feature | Status |
-|---|---|---|
+|---|---|
 | Project scaffolding | Complete |
 | Database migrations | Complete |
 | Authentication (Supabase Auth) | Complete — real auth enforced (middleware + layout redirect) |
@@ -401,7 +402,7 @@ status map for any new session.
 | Anchor role + moderation tools | Complete |
 | Worker directory (listings only) | Complete |
 | Community tab | Complete |
-| PWA configuration | Not started |
+| PWA configuration | Partial — service worker registered, offline-capable icon set; no service worker caching or push notification wiring |
 | Deep-link handler (verification notifications) | Complete |
 | Post-security-upgrade cleanup + bug fixes | Complete — config, 7 runtime bugs, error envelope, CORS, AI timeouts, token refresh, docs |
 | Auth restoration + redirect fixes | Complete — demo-mode 3-file bypass reverted; shared membership-lookup redirect utility; 2 broken redirects fixed; neighborhoodName city hardcodes fixed |
@@ -409,10 +410,9 @@ status map for any new session.
 | Alerts tab UI | Complete |
 | Demo sanity check | Complete (June 17, 2026) |
 | Demo script | Complete — see docs/Demo-Script.txt |
-| Deployment guide | Complete — see docs/Deployment-Guide.txt |
 | Pitch reference document | Complete — see docs/Halqa-Pitch-Reference.txt |
 | Post detail view | Complete |
-| Profile page | Partial — avatar, name, email, tier, neighborhood, sign out built; settings rows are placeholder stubs |
+| Profile page | Partial — avatar, name, email, tier, neighborhood, sign out built; settings rows are placeholder stubs ("coming soon") |
 | Vercel + Render deployment | Not started |
 
 ---
@@ -472,16 +472,14 @@ Three pre-staged accounts for demo walkthrough:
 9. **PWA**: Service worker registered. Offline-capable icon set.
 10. **Error handling**: Standard `{"data":null,"error":{...}}` envelope. CORS OPTIONS supported. 401 refresh-and-retry on apiFetch.
 
-**What is intentionally deferred (not built):**
-- Worker directory — implemented (backend + frontend + seed data)
+**What is intentionally deferred (not built or partially built):**
 - Full Urdu interface — English-only prototype
-- Offline/low-connectivity support — PWA registered but no service worker caching
+- Offline/low-connectivity support — PWA service worker registered but no caching strategy implemented
 - PDF export from dashboard — "coming soon" toast only
-- Manual review queue UI (OCR 0.40–0.749) — records stay pending
-- Push notifications — simulated via Supabase Realtime (no FCM/APNS)
-- Mobile native app — it is a PWA/web app
-- Post detail view — implemented (see status table above)
-- Profile page — upgraded from bare stub (avatar, name, email, tier, neighborhood, sign out); settings rows are stubs
+- Manual review queue UI (OCR confidence 0.40–0.749) — records stay pending, no reviewer interface
+- Push notifications — VAPID infrastructure wired but no active push delivery (no FCM/APNS); Supabase Realtime only
+- Mobile native app — web PWA only
+- Profile settings (notifications, privacy, about) — rows present but show "coming soon" toast
 
 **Three demo accounts and their states:**
 

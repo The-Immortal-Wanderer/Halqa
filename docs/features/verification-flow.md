@@ -1,6 +1,6 @@
 # Feature Spec: Verification Flow
 
-**Status:** Ready for implementation
+**Status:** Complete (June 17, 2026)
 **Depends on:** Onboarding feature (complete), Authentication (complete)
 **Produces:** Complete Tier 2 address verification — upload, OCR processing,
 pending/approved/rejected states, deep-link notification handling, and
@@ -377,14 +377,14 @@ actual tier from the membership data.
 
 ## Completion Criteria
 
-- [ ] All 4 screens render without errors
-- [ ] Upload flow: file selected → submitted → pending screen shown
-- [ ] OCR runs asynchronously after upload returns
-- [ ] Approved path: OCR confidence ≥ 0.75 → notification → result screen
+- [x] All 4 screens render without errors
+- [x] Upload flow: file selected → submitted → pending screen shown
+- [x] OCR runs asynchronously after upload returns
+- [x] Approved path: OCR confidence ≥ 0.75 → notification → result screen
       → tier upgraded → /feed accessible as Tier 2
-- [ ] Rejected path: OCR confidence < 0.40 → notification → rejected
+- [x] Rejected path: OCR confidence < 0.40 → notification → rejected
       screen with correct reason → retry navigates to upload screen
-- [ ] Document deleted from storage after OCR completes
-- [ ] Tier 1 banner visible in feed for unverified members
-- [ ] next build passes with 0 errors
-- [ ] AGENTS.md "Verification flow" → Complete
+- [x] Document deleted from storage after OCR completes
+- [x] Tier 1 banner visible in feed for unverified members
+- [x] next build passes with 0 errors
+- [x] AGENTS.md "Verification flow" → Complete

@@ -49,6 +49,7 @@ backend/
 │   │   ├── worker_service.py
 │   │   ├── anchor_service.py
 │   │   ├── notification_service.py     ← Web Push delivery
+│   │   ├── ocr_service.py              ← Gemini Vision OCR for verification documents
 │   │   └── storage_service.py          ← Supabase Storage operations
 │   ├── repositories/
 │   │   ├── user_repo.py
@@ -98,6 +99,7 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str
     supabase_anon_key: str
+    supabase_service_role_key: str  # Service role key — bypasses RLS, never expose to frontend
 
     # Gemini
     gemini_api_key: str

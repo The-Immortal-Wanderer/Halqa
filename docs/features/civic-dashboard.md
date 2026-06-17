@@ -1,6 +1,6 @@
 # Feature Spec: Civic Dashboard
 
-**Status:** Ready for implementation
+**Status:** Complete (June 17, 2026)
 **Depends on:** Feed + emergency alerts (complete), Database migrations (complete)
 **Produces:** The aggregated neighborhood intelligence view — the screen that
 most directly answers the "AI for Civic Innovation" brief and differentiates
@@ -330,14 +330,14 @@ re-seed before the demo.
 
 ## Completion Criteria
 
-- [ ] Dashboard loads with the 30-day view by default
-- [ ] Period selector switches between 7d / 30d / 90d without page reload
-- [ ] All 4 metric cards show correct values from snapshot
-- [ ] Category breakdown bar renders with correct proportions and legend
-- [ ] Resolution rate bar renders correctly
-- [ ] Recent emergencies list shows live data (up to 5 items)
-- [ ] "Copy report text" copies the exact civic export format to clipboard
-- [ ] Tier 1 members see a verify-first prompt instead of the dashboard
-- [ ] Seeded demo data (Green Valley Housing Society) displays correctly
-- [ ] next build passes with 0 errors
-- [ ] AGENTS.md "Civic dashboard" → Complete
+- [x] Dashboard loads with the 30-day view by default
+- [x] Period selector switches between 7d / 30d / 90d without page reload
+- [x] All 4 metric cards show correct values from snapshot
+- [x] Category breakdown bar renders with correct proportions and legend
+- [x] Resolution rate bar renders correctly
+- [x] Recent emergencies list shows live data (up to 5 items)
+- [x] "Copy report text" copies the exact civic export format to clipboard
+- [x] Tier 1 members see a verify-first prompt instead of the dashboard
+- [x] Seeded demo data (Green Valley Housing Society) displays correctly
+- [x] next build passes with 0 errors
+- [x] AGENTS.md "Civic dashboard" → Complete
