@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
+import type { CommunityResponse } from "@/types";
 
 export interface JoinRequest {
   neighborhood_id: string;
@@ -19,4 +20,9 @@ export const membersApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  getMembers: (neighborhoodId: string, limit: number = 50) =>
+    apiFetch<CommunityResponse>(
+      `/neighborhoods/${neighborhoodId}/members?limit=${limit}`,
+    ),
 };

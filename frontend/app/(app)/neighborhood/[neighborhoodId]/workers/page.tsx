@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Briefcase, Plus } from "@phosphor-icons/react";
+import { Briefcase } from "@phosphor-icons/react";
 import { useDirectory } from "@/hooks/useDirectory";
 import { WorkerCard } from "@/components/directory/WorkerCard";
 import { ServiceFilter } from "@/components/directory/ServiceFilter";
@@ -26,11 +26,18 @@ function SkeletonRow() {
   );
 }
 
-export default function DirectoryPage() {
+export default function WorkersPage() {
   const params = useParams();
   const neighborhoodId = params?.neighborhoodId as string | undefined;
-  const { listings, total, loading, error, refetch, serviceTypeFilter, setServiceTypeFilter } =
-    useDirectory(neighborhoodId);
+  const {
+    listings,
+    total,
+    loading,
+    error,
+    refetch,
+    serviceTypeFilter,
+    setServiceTypeFilter,
+  } = useDirectory(neighborhoodId);
 
   return (
     <div className="pb-24">
@@ -42,16 +49,18 @@ export default function DirectoryPage() {
         >
           Worker Directory
         </h1>
-        <p
-          className="mt-1 text-halqa-ink-mid"
-          style={{ fontSize: "15px" }}
-        >
-          Verified by your neighbors
+        <p className="mt-1 text-halqa-ink-mid" style={{ fontSize: "15px" }}>
+          {total > 0
+            ? `${total} service worker${total !== 1 ? "s" : ""} in your area`
+            : "Find local service workers"}
         </p>
       </div>
 
       {/* Service type filter */}
-      <ServiceFilter selected={serviceTypeFilter} onSelect={setServiceTypeFilter} />
+      <ServiceFilter
+        selected={serviceTypeFilter}
+        onSelect={setServiceTypeFilter}
+      />
 
       {/* Loading state */}
       {loading && (
@@ -89,7 +98,13 @@ export default function DirectoryPage() {
             className="text-center text-halqa-ink-mid"
             style={{ fontSize: "13px" }}
           >
-            No workers listed yet. Add one you trust.
+            No service workers yet
+          </p>
+          <p
+            className="text-center text-halqa-ink-light"
+            style={{ fontSize: "12px" }}
+          >
+            Check back later for listings in your area
           </p>
         </div>
       )}
@@ -106,18 +121,6 @@ export default function DirectoryPage() {
           ))}
         </div>
       )}
-
-      {/* Floating action button */}
-      <button
-        onClick={() => {
-          // TODO: Open add-worker bottom sheet/modal
-          alert("Add worker flow coming soon");
-        }}
-        className="fixed bottom-20 right-4 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-halqa-teal text-white shadow-lg transition-colors hover:bg-halqa-teal-dark"
-        aria-label="Add a worker"
-      >
-        <Plus size={24} weight="bold" />
-      </button>
     </div>
   );
 }

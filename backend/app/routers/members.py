@@ -2,16 +2,19 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path, Query
 from supabase import Client
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_member, get_current_user
 from app.core.errors import ErrorCode, api_error
 from app.db.dependencies import get_db
-from app.schemas.common import APIResponse, AuthUser
+from app.repositories import anchor_repo, membership_repo
+from app.schemas.common import APIResponse, AuthMember, AuthUser
 from app.schemas.membership import (
     JoinAPIResponse,
     JoinResponse,
+    MemberListData,
+    MemberListItem,
     MembershipJoinRequest,
     MembershipDetailAPIResponse,
 )
@@ -69,10 +72,34 @@ async def get_my_membership(
 
 @router.get("/neighborhoods/{neighborhood_id}/members")
 async def list_members(
-    neighborhood_id: UUID,
+    neighborhood_id: UUID = Path(...),
+    limit: int = Query(50, ge=1, le=100, description="Max members to return"),
+    member: AuthMember = Depends(get_current_member),
     db: Client = Depends(get_db),
-) -> APIResponse:
-    """List all active members for the anchor's management view."""
-    return APIResponse.err(
-        ErrorCode.NOT_IMPLEMENTED, "This endpoint is not yet implemented"
-    )
+) -> APIResponse[MemberListData]:
+    """List all active members of the neighborhood for the community tab.
+
+    Requires the calling user to be a member of this neighborhood (Tier 1+).
+    Returns members ordered by join date (oldest first) with tier, display name,
+    and anchor status.
+    """
+    # Fetch all active members with user display_name
+    members_data = await membership_repo.list_members(db, neighborhood_id, limit=limit)
+
+    # Check if there's an active anchor for this neighborhood
+    active_anchor = anchor_repo.get_active_anchor_role(neighborhood_id=neighborhood_id)
+    anchor_member_id = str(active_anchor["member_id"]) if active_anchor else None
+
+    # Build response items
+    items: list[MemberListItem] = []
+    for m in members_data:
+        users_info = m.get("users") or {}
+        items.append(MemberListItem(
+            member_id=m["id"],
+            display_name=users_info.get("display_name") or "Unknown",
+            tier=m["tier"],
+            joined_at=m["joined_at"],
+            is_anchor=str(m["id"]) == anchor_member_id if anchor_member_id else False,
+        ))
+
+    return APIResponse.ok(MemberListData(members=items, total=len(items)))

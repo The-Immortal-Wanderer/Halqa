@@ -110,7 +110,14 @@ async def login(
         result = db.auth.sign_in_with_password(
             {"email": body.email, "password": body.password}
         )
-    except Exception:
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "429" in msg or "too many requests" in msg or "rate limit" in msg:
+            raise api_error(
+                429,
+                ErrorCode.RATE_LIMIT_EXCEEDED,
+                "Too many login attempts. Please wait a moment and try again.",
+            )
         raise api_error(
             401,
             ErrorCode.INVALID_CREDENTIALS,

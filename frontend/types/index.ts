@@ -6,6 +6,54 @@
 // ── Verification Tiers ─────────────────────────────────────────────────────
 export type VerificationTier = "tier_1" | "tier_2" | "tier_3";
 
+// ── Worker Directory ───────────────────────────────────────────────────────
+export interface WorkerListing {
+  id: string;
+  neighborhood_id: string;
+  created_by_member_id: string;
+  name: string;
+  service_type: string;
+  description: string | null;
+  contact_phone: string | null;
+  is_promoted: boolean;
+  earned_badge: string;
+  min_completed_jobs: number;
+  average_rating: number | null;
+  status: string;
+  review_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  /** Computed from description — not in API response, kept for legacy WorkerCard */
+  area_served?: string | null;
+}
+
+export interface WorkerReview {
+  id: string;
+  listing_id: string;
+  reviewer_member_id: string;
+  reviewer_display_name?: string | null;
+  rating: number | null;
+  review_body: string | null;
+  created_at: string | null;
+}
+
+export interface WorkerListData {
+  listings: WorkerListing[];
+  total: number;
+}
+
+export interface WorkerDetailData {
+  listing: WorkerListing;
+  reviews: WorkerReview[];
+}
+
+export interface CreateWorkerListingRequest {
+  name: string;
+  service_type: string;
+  description?: string;
+  contact_phone?: string;
+}
+
 // ── Author Info ────────────────────────────────────────────────────────────
 export interface AuthorInfo {
   id: string; // users.id
@@ -158,42 +206,8 @@ export interface User {
   created_at: string;
 }
 
-// ── Worker Review ──────────────────────────────────────────────────────────
-export interface WorkerReview {
-  id: string;
-  listing_id: string;
-  reviewer_member_id: string;
-  rating: number;
-  comment?: string;
-  created_at: string;
-}
-
-export interface CreateListingRequest {
-  worker_name: string;
-  category: string;
-  description?: string;
-  contact_phone: string;
-}
-
-export interface CreateReviewRequest {
-  rating: number;
-  comment?: string;
-}
-
 // ── Post Category ───────────────────────────────────────────────────────────
 export type PostCategory = "emergency" | "power" | "security" | "infrastructure" | "water" | "general";
-
-// ── Worker Listing ─────────────────────────────────────────────────────────
-export interface WorkerListing {
-  id: string;
-  worker_name: string;
-  category: string;
-  description?: string;
-  average_rating: number | null;
-  confirmed_job_count: number;
-  contact_phone?: string;
-  is_verified_badge: boolean;
-}
 
 // ── Anchor Role ────────────────────────────────────────────────────────────
 export interface AnchorStatusResponse {
@@ -288,6 +302,20 @@ export interface Tier3VouchingRequest {
   status: string;
   anchor_signed: boolean;
   cosigner_signed: boolean;
+}
+
+// ── Community / Member Listing ─────────────────────────────────────────────
+export interface CommunityMember {
+  member_id: string;
+  display_name: string;
+  tier: VerificationTier;
+  joined_at: string;
+  is_anchor: boolean;
+}
+
+export interface CommunityResponse {
+  members: CommunityMember[];
+  total: number;
 }
 
 // ── Dashboard Period ────────────────────────────────────────────────────────

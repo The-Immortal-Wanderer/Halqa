@@ -1,5 +1,10 @@
-"""Worker directory request/response schemas."""
+"""Worker directory request/response schemas.
 
+Maps to deployed DB schema (migration 20260611_001):
+  worker_listings: worker_name, worker_phone, service_type,
+    is_promoted, earned_badge, min_completed_jobs, avg_rating, status
+  worker_reviews: rating, review_body, is_published, job_confirmed_*
+"""
 from __future__ import annotations
 
 from typing import Optional
@@ -10,62 +15,60 @@ from pydantic import BaseModel, Field
 from app.schemas.common import APIResponse
 
 
-class WorkerListingResponse(BaseModel):
-    """A single worker listing in the directory."""
+ALLOWED_SERVICE_TYPES = frozenset({
+    "plumber", "electrician", "maid", "driver", "cook", "handyman", "other",
+})
 
+
+class WorkerListingResponse(BaseModel):
+    """Worker listing — API-friendly field names (mapped in service layer)."""
     id: UUID
     neighborhood_id: UUID
-    submitted_by: UUID
-    worker_name: str
-    category: str
+    created_by_member_id: UUID
+    name: str                          # DB: worker_name
+    service_type: str
     description: Optional[str] = None
-    contact_info: Optional[str] = None  # null for Tier 1 members
-    is_verified_badge: bool = False
-    confirmed_job_count: int = 0
-    average_rating: Optional[float] = None
+    contact_phone: Optional[str] = None  # DB: worker_phone, hidden from Tier 1
     is_promoted: bool = False
-    created_at: str
+    earned_badge: str = "none"
+    min_completed_jobs: int = 0
+    average_rating: Optional[float] = None  # DB: avg_rating
+    status: str = "active"
+    review_count: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class WorkerListingCreate(BaseModel):
-    """Body for creating a new worker listing."""
-
-    worker_name: str = Field(..., min_length=2, max_length=80)
-    category: str
+    """Body for creating a new listing (API-friendly names)."""
+    name: str = Field(..., min_length=2, max_length=80)
+    service_type: str
     description: Optional[str] = Field(None, max_length=300)
-    contact_info: str = Field(..., max_length=200)
+    contact_phone: Optional[str] = Field(None, max_length=50)
 
 
 class WorkerReviewResponse(BaseModel):
-    """A review left for a worker listing."""
-
+    """A published review."""
     id: UUID
     listing_id: UUID
-    reviewer_id: UUID
-    reviewer_display_name: str
-    rating: int  # 1–5
-    review_text: Optional[str] = None
-    job_confirmed: bool
-    created_at: str
+    reviewer_member_id: UUID
+    rating: Optional[int] = None
+    review_body: Optional[str] = None
+    created_at: Optional[str] = None
 
 
-class WorkerReviewCreate(BaseModel):
-    """Body for creating a review."""
-
-    rating: int = Field(..., ge=1, le=5)
-    content: str = Field(..., max_length=500)
-    job_confirmed: bool = True
-
-
-class WorkerListResponse(BaseModel):
+class WorkerListData(BaseModel):
     """Paginated worker listings."""
-
     listings: list[WorkerListingResponse]
     total: int
 
 
-# Type aliases
+class WorkerDetailData(BaseModel):
+    """Single worker listing with reviews."""
+    listing: WorkerListingResponse
+    reviews: list[WorkerReviewResponse]
+
+
 WorkerListingAPIResponse = APIResponse[WorkerListingResponse]
-WorkerListAPIResponse = APIResponse[WorkerListResponse]
-WorkerReviewAPIResponse = APIResponse[WorkerReviewResponse]
-WorkerReviewListAPIResponse = APIResponse[list[WorkerReviewResponse]]
+WorkerListAPIResponse = APIResponse[WorkerListData]
+WorkerDetailAPIResponse = APIResponse[WorkerDetailData]

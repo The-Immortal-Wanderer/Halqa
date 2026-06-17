@@ -1,113 +1,178 @@
-"""Data access for the worker_listings and worker_reviews tables."""
+"""Data access for worker_listings and worker_reviews.
 
-import logging
+Aligns to deployed schema column names from migration 20260611_001:
+  worker_listings: worker_name, worker_phone, service_type, is_promoted,
+    earned_badge, min_completed_jobs, avg_rating, status
+  worker_reviews: rating, review_body, is_published, job_confirmed_*
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
 from uuid import UUID
 
-from supabase import Client
-
-logger = logging.getLogger(__name__)
+from app.db.client import new_thread_safe_client
 
 
-# async def get_listing(db: Client, listing_id: UUID, neighborhood_id: UUID) -> dict | None:
-#     """Fetch a single worker listing."""
-#     result = (
-#         db.table("worker_listings")
-#         .select("*")
-#         .eq("id", str(listing_id))
-#         .eq("neighborhood_id", str(neighborhood_id))
-#         .single()
-#         .execute()
-#     )
-#     return result.data if result.data else None
+def count_published_reviews(*, listing_id: UUID) -> int:
+    """Count published reviews for a listing."""
+    client = new_thread_safe_client()
+    try:
+        result = (
+            client.table("worker_reviews")
+            .select("id", count="exact")
+            .eq("listing_id", str(listing_id))
+            .eq("is_published", True)
+            .execute()
+        )
+        return result.count if hasattr(result, "count") and result.count else 0
+    finally:
+        client.auth.sign_out()
 
 
-# async def list_listings(
-#     db: Client,
-#     neighborhood_id: UUID,
-#     category: str | None = None,
-#     limit: int = 20,
-#     offset: int = 0,
-# ) -> list[dict]:
-#     """List worker listings for a neighborhood, optionally filtered by category."""
-#     query = (
-#         db.table("worker_listings")
-#         .select("*")
-#         .eq("neighborhood_id", str(neighborhood_id))
-#     )
-#     if category:
-#         query = query.eq("category", category)
-#     result = (
-#         query
-#         .order("is_verified_badge", desc=True)
-#         .order("created_at", desc=True)
-#         .limit(limit)
-#         .offset(offset)
-#         .execute()
-#     )
-#     return result.data or []
+def list_listings(
+    *,
+    neighborhood_id: UUID,
+    service_type: str | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    """List active worker listings ordered by avg_rating DESC."""
+    client = new_thread_safe_client()
+    try:
+        query = (
+            client.table("worker_listings")
+            .select("*")
+            .eq("neighborhood_id", str(neighborhood_id))
+            .eq("status", "active")
+        )
+        if service_type:
+            query = query.eq("service_type", service_type)
+        result = (
+            query.order("avg_rating", desc=True)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+    finally:
+        client.auth.sign_out()
 
 
-# async def create_listing(db: Client, neighborhood_id: UUID, submitted_by: UUID, data: dict) -> dict:
-#     """Create a new worker listing."""
-#     result = (
-#         db.table("worker_listings")
-#         .insert({
-#             "neighborhood_id": str(neighborhood_id),
-#             "submitted_by": str(submitted_by),
-#             **data,
-#         })
-#         .execute()
-#     )
-#     return result.data[0]
+def get_listing(*, listing_id: UUID) -> dict | None:
+    """Fetch a single active worker listing by id."""
+    client = new_thread_safe_client()
+    try:
+        result = (
+            client.table("worker_listings")
+            .select("*")
+            .eq("id", str(listing_id))
+            .eq("status", "active")
+            .maybe_single()
+            .execute()
+        )
+        return result.data if result and result.data else None
+    finally:
+        client.auth.sign_out()
 
 
-# async def get_review_by_reviewer(db: Client, listing_id: UUID, reviewer_id: UUID) -> dict | None:
-#     """Check if a user has already reviewed this listing."""
-#     result = (
-#         db.table("worker_reviews")
-#         .select("*")
-#         .eq("listing_id", str(listing_id))
-#         .eq("reviewer_id", str(reviewer_id))
-#         .single()
-#         .execute()
-#     )
-#     return result.data if result.data else None
+def create_listing(
+    *,
+    member_id: UUID,
+    neighborhood_id: UUID,
+    worker_name: str,
+    service_type: str,
+    description: str | None = None,
+    worker_phone: str | None = None,
+) -> dict:
+    """Create a new worker listing using deployed schema column names."""
+    client = new_thread_safe_client()
+    try:
+        now = datetime.utcnow().isoformat()
+        insert = {
+            "created_by_member_id": str(member_id),
+            "neighborhood_id": str(neighborhood_id),
+            "worker_name": worker_name,
+            "service_type": service_type,
+            "status": "active",
+            "created_at": now,
+            "updated_at": now,
+        }
+        if description is not None:
+            insert["description"] = description
+        if worker_phone is not None:
+            insert["worker_phone"] = worker_phone
+
+        result = (
+            client.table("worker_listings").insert(insert).execute()
+        )
+        if result and result.data and len(result.data) > 0:
+            return result.data[0]
+        return {}
+    finally:
+        client.auth.sign_out()
 
 
-# async def create_review(db: Client, listing_id: UUID, reviewer_id: UUID, rating: int, content: str) -> dict:
-#     """Insert a new review."""
-#     result = (
-#         db.table("worker_reviews")
-#         .insert({
-#             "listing_id": str(listing_id),
-#             "reviewer_id": str(reviewer_id),
-#             "rating": rating,
-#             "review_text": content,
-#             "job_confirmed": True,
-#         })
-#         .execute()
-#     )
-#     return result.data[0]
+def list_reviews(*, listing_id: UUID, limit: int = 10) -> list[dict]:
+    """Return published worker_reviews for a listing, newest first."""
+    client = new_thread_safe_client()
+    try:
+        result = (
+            client.table("worker_reviews")
+            .select("*")
+            .eq("listing_id", str(listing_id))
+            .eq("is_published", True)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+    finally:
+        client.auth.sign_out()
 
 
-# async def compute_listing_stats(db: Client, listing_id: UUID) -> dict:
-#     """Compute average rating and review count for a listing."""
-#     result = (
-#         db.table("worker_reviews")
-#         .select("rating", count="exact")
-#         .eq("listing_id", str(listing_id))
-#         .execute()
-#     )
-#     ratings = [r["rating"] for r in (result.data or []) if r.get("rating")]
-#     avg = sum(ratings) / len(ratings) if ratings else 0.0
-#     return {"average_rating": round(avg, 2), "review_count": len(ratings)}
+def get_review_by_reviewer(
+    *, listing_id: UUID, reviewer_member_id: UUID
+) -> dict | None:
+    """Check if a member has already reviewed this listing."""
+    client = new_thread_safe_client()
+    try:
+        result = (
+            client.table("worker_reviews")
+            .select("*")
+            .eq("listing_id", str(listing_id))
+            .eq("reviewer_member_id", str(reviewer_member_id))
+            .maybe_single()
+            .execute()
+        )
+        return result.data if result and result.data else None
+    finally:
+        client.auth.sign_out()
 
 
-# async def update_listing_stats(db: Client, listing_id: UUID, stats: dict) -> None:
-#     """Update a listing's average rating and review count."""
-#     db.table("worker_listings").update(stats).eq("id", str(listing_id)).execute()
-
-
-# async def set_verified_badge(db: Client, listing_id: UUID, badge: bool) -> None:
-#     """Set the verified badge on a listing."""
-#     db.table("worker_listings").update({"is_verified_badge": badge}).eq("id", str(listing_id)).execute()
+def create_review(
+    *,
+    listing_id: UUID,
+    reviewer_member_id: UUID,
+    rating: int,
+    review_body: str | None = None,
+) -> dict:
+    """Insert a new review."""
+    client = new_thread_safe_client()
+    try:
+        now = datetime.utcnow().isoformat()
+        result = (
+            client.table("worker_reviews")
+            .insert({
+                "listing_id": str(listing_id),
+                "reviewer_member_id": str(reviewer_member_id),
+                "rating": rating,
+                "review_body": review_body or "",
+                "created_at": now,
+            })
+            .execute()
+        )
+        if result and result.data and len(result.data) > 0:
+            return result.data[0]
+        return {}
+    finally:
+        client.auth.sign_out()

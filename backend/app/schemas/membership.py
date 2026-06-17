@@ -48,8 +48,28 @@ class JoinResponse(BaseModel):
     onboarding_complete: bool
 
 
+
+
+class MemberListItem(BaseModel):
+    """Individual member record for the community listing."""
+
+    member_id: UUID
+    display_name: str
+    tier: str  # "tier_1" | "tier_2" | "tier_3"
+    joined_at: str
+    is_anchor: bool
+
+
+class MemberListData(BaseModel):
+    """Wrapper for the community member list response."""
+
+    members: list[MemberListItem]
+    total: int
+
+
 # Type aliases
 MembershipAPIResponse = APIResponse[NeighborhoodMembershipResponse]
 MembershipDetailAPIResponse = APIResponse[MembershipDetail]
 MemberListAPIResponse = APIResponse[list[dict]]  # Flexible — refined when typed
+MemberListTypedAPIResponse = APIResponse[MemberListData]
 JoinAPIResponse = APIResponse[JoinResponse]

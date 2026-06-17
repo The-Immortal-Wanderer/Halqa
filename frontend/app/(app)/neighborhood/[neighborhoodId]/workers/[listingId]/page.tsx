@@ -42,7 +42,7 @@ export default function ListingDetailPage() {
   const listingId = params?.listingId as string | undefined;
   const { listing, reviews, loading, error, refetch } = useListingDetail(
     neighborhoodId,
-    listingId
+    listingId,
   );
 
   const renderStars = (rating: number | null, size: number = 14) => {
@@ -63,7 +63,9 @@ export default function ListingDetailPage() {
     );
   };
 
-  const Icon = listing ? (SERVICE_ICONS[listing.service_type] ?? Briefcase) : Briefcase;
+  const Icon = listing
+    ? (SERVICE_ICONS[listing.service_type] ?? Briefcase)
+    : Briefcase;
 
   return (
     <div className="pb-20">
@@ -149,7 +151,7 @@ export default function ListingDetailPage() {
             {listing.contact_phone && (
               <a
                 href={`tel:${listing.contact_phone}`}
-                className="block text-halqa-ink-primary underline underline-offset-2"
+                className="block text-halqa-ink-mid underline underline-offset-2"
                 style={{ fontSize: "13px" }}
               >
                 {listing.contact_phone}
@@ -205,7 +207,7 @@ export default function ListingDetailPage() {
                 className="py-6 text-center text-halqa-ink-mid"
                 style={{ fontSize: "13px" }}
               >
-                No reviews yet. Be the first.
+                No reviews yet.
               </p>
             )}
 

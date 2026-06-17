@@ -399,7 +399,8 @@ status map for any new session.
 | Emergency alerts + alerts page | Complete |
 | Civic dashboard | Complete |
 | Anchor role + moderation tools | Complete |
-| Worker directory (listings only) | Not started |
+| Worker directory (listings only) | Complete |
+| Community tab | Complete |
 | PWA configuration | Not started |
 | Deep-link handler (verification notifications) | Complete |
 | Post-security-upgrade cleanup + bug fixes | Complete — config, 7 runtime bugs, error envelope, CORS, AI timeouts, token refresh, docs |
@@ -470,14 +471,14 @@ Three pre-staged accounts for demo walkthrough:
 10. **Error handling**: Standard `{"data":null,"error":{...}}` envelope. CORS OPTIONS supported. 401 refresh-and-retry on apiFetch.
 
 **What is intentionally deferred (not built):**
-- Worker directory — DB schema exists, router commented out
+- Worker directory — implemented (backend + frontend + seed data)
 - Full Urdu interface — English-only prototype
 - Offline/low-connectivity support — PWA registered but no service worker caching
 - PDF export from dashboard — "coming soon" toast only
 - Manual review queue UI (OCR 0.40–0.749) — records stay pending
 - Push notifications — simulated via Supabase Realtime (no FCM/APNS)
 - Mobile native app — it is a PWA/web app
-- Worker directory, community page, profile page — bare stub routes
+- Profile page — bare stub route
 
 **Three demo accounts and their states:**
 

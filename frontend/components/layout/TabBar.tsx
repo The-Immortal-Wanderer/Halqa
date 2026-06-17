@@ -7,7 +7,7 @@ import {
   House,
   Bell,
   Users,
-  Briefcase,
+  Wrench,
   ChartBar,
   ShieldCheck,
 } from "@phosphor-icons/react";
@@ -17,7 +17,7 @@ const TABS: Array<{ label: string; icon: React.ElementType; href: string }> = [
   { label: "Feed", icon: House, href: "" },
   { label: "Alerts", icon: Bell, href: "/alerts" },
   { label: "Community", icon: Users, href: "/community" },
-  { label: "Directory", icon: Briefcase, href: "/directory" },
+  { label: "Directory", icon: Wrench, href: "/workers" },
   { label: "Dashboard", icon: ChartBar, href: "/dashboard" },
 ];
 
