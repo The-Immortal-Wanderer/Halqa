@@ -410,6 +410,7 @@ status map for any new session.
 | Alerts tab UI | Complete |
 | Demo sanity check | Complete (June 17, 2026) |
 | Demo script | Complete — see docs/Demo-Script.txt |
+| Deployment guide | Complete — see docs/Deployment-Guide.txt |
 | Pitch reference document | Complete — see docs/Halqa-Pitch-Reference.txt |
 | Post detail view | Complete |
 | Profile page | Partial — avatar, name, email, tier, neighborhood, sign out built; settings rows are placeholder stubs ("coming soon") |

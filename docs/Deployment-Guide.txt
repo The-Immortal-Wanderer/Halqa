@@ -1,0 +1,380 @@
+=== HALQA DEPLOYMENT GUIDE ===
+Last updated: June 17, 2026
+Stack: Next.js 14 (Vercel) + FastAPI (Render) + Supabase
+
+This guide covers deploying Halqa from this monorepo to production for the
+first time. The order matters — Supabase must be ready before the backend
+is deployed, and the backend must be live before the frontend can call it.
+
+---
+
+=== PART 1: PREREQUISITES ===
+
+Before starting:
+
+1. A Supabase project must exist at app.supabase.com. Note the following
+   from the Supabase Dashboard → Project Settings → API:
+   - Project URL           (SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL)
+   - anon / public key     (SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY)
+   - service_role / secret (SUPABASE_SERVICE_ROLE_KEY — never expose to frontend)
+
+2. A Google AI Studio API key from https://aistudio.google.com/apikey
+   (GEMINI_API_KEY — free tier, Gemma 4 31B, 15 RPM limit)
+
+3. A Render account at render.com with access to create a Web Service.
+
+4. A Vercel account at vercel.com with access to create a Project.
+
+5. The Supabase CLI installed locally (for applying migrations):
+   npm install -g supabase
+   supabase login
+
+VAPID keys for Web Push (optional — the app functions without them):
+   npx web-push generate-vapid-keys
+   Save the output — you will need VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.
+
+---
+
+=== PART 2: DATABASE — SUPABASE MIGRATIONS ===
+
+All schema lives in supabase/migrations/. Apply every migration in
+filename order to the production Supabase project.
+
+Step 1: Link the Supabase CLI to your project.
+
+   supabase link --project-ref <your-project-ref>
+
+   The project ref is the alphanumeric string in your Supabase project URL:
+   https://app.supabase.com/project/<project-ref>
+
+Step 2: Apply all migrations in order.
+
+   supabase db push
+
+   This applies every .sql file in supabase/migrations/ in lexicographic
+   (filename) order. The current migration set is:
+
+   1. 20260611_001_initial_schema.sql          — full schema, enums, RLS, seed data
+   2. 20260612000000_add_onboarding_complete.sql
+   3. 20260612002000_add_rejection_reason.sql
+   4. 20260612003000_add_tier_target.sql
+   5. 20260612004000_add_notifications_data.sql
+   6. 20260613004_add_posts_civic_signal.sql
+   7. 20260613005000_add_post_reports.sql
+   8. 20260617001000_add_worker_rls_tier1.sql
+
+   If `supabase db push` fails on an already-applied migration, use:
+   supabase db push --include-all
+
+   Alternatively, apply each file manually via the Supabase Dashboard →
+   SQL Editor → paste file contents → Run.
+
+Step 3: Confirm schema is applied.
+
+   In the Supabase Dashboard → Table Editor, verify these tables exist:
+   users, neighborhoods, neighborhood_members, posts, verification_records,
+   verification_documents, civic_dashboard_snapshots, anchor_roles,
+   anchor_actions_log, moderation_escalations, vouching_requests,
+   worker_listings, notifications
+
+Step 4: Seed demo data (hackathon demo only).
+
+   The initial migration (20260611_001_initial_schema.sql) includes seed
+   inserts for the Green Valley Housing Society demo neighborhood
+   (id: 00000000-0000-0000-0000-000000000001) including:
+   - 5 seed posts (2 emergencies, 1 resolved, 1 security, 1 general)
+   - 3 civic_dashboard_snapshots (7d, 30d, 90d)
+   - Seed worker listings
+
+   If these were not applied with the migration, run the seed block from
+   the initial migration file manually in the SQL Editor.
+
+Step 5: Create demo accounts.
+
+   The three demo accounts (demo.anchor@gmail.com, demo.tier1@halqa.pk,
+   demo.resident@halqa.pk) were created via the Supabase admin API and
+   are not in any migration file. Re-create them if deploying to a new
+   Supabase project:
+
+   In Supabase Dashboard → Authentication → Users → Add user (email):
+   - demo.anchor@gmail.com   / Demo@987   — then manually set membership
+   - demo.tier1@halqa.pk     / Demo@987
+   - demo.resident@halqa.pk  / Demo@987
+
+   After creating the auth users, insert the neighborhood_members and
+   anchor_roles rows using the user UUIDs. See AGENTS.md → Demo Accounts
+   section for the full account state required.
+
+Step 6: Enable Row Level Security.
+
+   RLS is defined in the initial migration. Confirm it is active:
+   In Dashboard → Table Editor → select any table → RLS should show
+   "Enabled". If not, run: ALTER TABLE <tablename> ENABLE ROW LEVEL SECURITY;
+
+Step 7: Configure Supabase Auth settings.
+
+   In Dashboard → Authentication → Settings:
+   - Site URL: set to your Vercel production URL (e.g. https://halqa.vercel.app)
+   - Redirect URLs: add your production URL and localhost:3000 for local dev
+   - Email confirmation: enabled (accounts created via admin API bypass this)
+   - JWT expiry: default (3600 seconds) is fine
+
+---
+
+=== PART 3: BACKEND — RENDER DEPLOYMENT ===
+
+The backend is a FastAPI app. Render reads from backend/render.yaml.
+
+Step 1: Connect the repository to Render.
+
+   - Go to render.com → New → Web Service
+   - Connect your GitHub repository
+   - Set Root Directory to: backend
+   - Render will detect render.yaml automatically
+
+   The render.yaml specifies:
+   - Build command: pip install -r requirements.txt
+   - Start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   - Health check path: /health
+   - Python version: 3.11.0
+
+Step 2: Set environment variables in Render.
+
+   In Render Dashboard → your service → Environment → Add environment
+   variable (one per line, do not commit these to the repo):
+
+   SUPABASE_URL               = https://<ref>.supabase.co
+   SUPABASE_ANON_KEY          = <sb_publishable_...>
+   SUPABASE_SERVICE_ROLE_KEY  = <sb_secret_...>
+   GEMINI_API_KEY             = <your-google-ai-key>
+   ENVIRONMENT                = production
+   LOG_LEVEL                  = INFO
+   ALLOWED_ORIGINS            = ["https://halqa.vercel.app"]
+
+   Optional (Web Push — leave blank if not using push notifications):
+   VAPID_PUBLIC_KEY           = <generated>
+   VAPID_PRIVATE_KEY          = <generated>
+   VAPID_EMAIL                = mailto:hello@halqa.pk
+
+   INTERNAL_SERVICE_TOKEN     = <random 32-char hex — openssl rand -hex 16>
+
+   IMPORTANT: ALLOWED_ORIGINS must be a valid JSON array string. In
+   pydantic-settings it is parsed as JSON. Example for multiple origins:
+   ["https://halqa.vercel.app","http://localhost:3000"]
+
+Step 3: Deploy.
+
+   Render deploys automatically on push to main (if auto-deploy is on).
+   To deploy manually: Render Dashboard → your service → Manual Deploy →
+   Deploy latest commit.
+
+Step 4: Verify the backend is live.
+
+   curl https://<your-render-service>.onrender.com/health
+
+   Expected response: {"status":"ok","environment":"production"}
+
+   If it returns 502: the service is still starting. Render free tier
+   instances spin down after 15 minutes of inactivity — first request
+   after sleep takes 30-60 seconds.
+
+Step 5: Note your backend URL.
+
+   It will be something like: https://halqa-api.onrender.com
+   This is your NEXT_PUBLIC_API_URL for the frontend, with /api/v1 appended:
+   https://halqa-api.onrender.com/api/v1
+
+---
+
+=== PART 4: FRONTEND — VERCEL DEPLOYMENT ===
+
+The frontend is a Next.js 14 App Router app. Vercel deploys from the
+frontend/ subdirectory.
+
+Step 1: Connect the repository to Vercel.
+
+   - Go to vercel.com → New Project
+   - Import from GitHub
+   - Set Root Directory to: frontend
+   - Framework Preset will auto-detect Next.js
+   - Leave build settings at defaults (next build / npm run build)
+
+Step 2: Set environment variables in Vercel.
+
+   In Vercel Dashboard → your project → Settings → Environment Variables.
+   Set for Production (and optionally Preview/Development):
+
+   NEXT_PUBLIC_SUPABASE_URL       = https://<ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY  = <sb_publishable_...>
+   NEXT_PUBLIC_API_URL            = https://halqa-api.onrender.com/api/v1
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY   = <generated>  (optional)
+
+   Note: Variables prefixed NEXT_PUBLIC_ are embedded in the client bundle
+   at build time. They are visible to users. Never put the service role key
+   or any secret in a NEXT_PUBLIC_ variable.
+
+Step 3: Deploy.
+
+   Vercel deploys automatically on push to main if connected to GitHub.
+   To deploy manually: Vercel Dashboard → your project → Deployments →
+   Redeploy.
+
+Step 4: Update Supabase Auth redirect URLs.
+
+   After the Vercel domain is assigned (e.g. halqa.vercel.app):
+   In Supabase Dashboard → Authentication → URL Configuration:
+   - Site URL: https://halqa.vercel.app
+   - Redirect URLs: add https://halqa.vercel.app/** and http://localhost:3000/**
+
+Step 5: Verify the frontend is live.
+
+   Navigate to your Vercel URL. You should be redirected to /onboarding.
+   Try logging in with one of the demo accounts.
+
+---
+
+=== PART 5: POST-DEPLOYMENT VERIFICATION CHECKLIST ===
+
+Run through these manually after every production deployment.
+
+BACKEND:
+[ ] GET  /health returns {"status":"ok","environment":"production"}
+[ ] GET  /api/v1/neighborhoods/search?q=green returns Green Valley result
+[ ] POST /api/v1/auth/login with demo.anchor@gmail.com / Demo@987 returns
+    a valid access_token
+[ ] GET  /api/v1/posts?neighborhood_id=00000000-0000-0000-0000-000000000001
+    returns 5 seed posts
+[ ] GET  /api/v1/dashboard/snapshot?period_type=30d returns snapshot data
+[ ] GET  /api/v1/anchor/status with anchor JWT returns {is_anchor: true}
+[ ] GET  /api/v1/workers?neighborhood_id=... returns worker listings
+
+FRONTEND:
+[ ] / redirects unauthenticated users to /onboarding
+[ ] Login with demo.anchor@gmail.com / Demo@987 reaches the feed
+[ ] Feed shows 5 posts, emergency cards at top, resolved card at bottom
+[ ] Dashboard tab loads metric cards and category breakdown
+[ ] Anchor tab is visible for the anchor account and shows moderation queue
+[ ] Creating a new post appears in the feed immediately (Supabase Realtime)
+[ ] Community tab shows verified member list
+[ ] Directory tab shows worker listings with service filter
+[ ] Profile tab shows name, email, tier, neighbourhood name, sign-out button
+
+SUPABASE:
+[ ] RLS is enabled on all tables (check Table Editor — no table shows RLS Off)
+[ ] Realtime is enabled for the posts table (Dashboard → Realtime)
+[ ] The verification-documents storage bucket exists and is private (not public)
+
+---
+
+=== PART 6: RUNNING LOCALLY (DEV) ===
+
+Backend:
+   cd backend
+   python -m venv venv
+   venv\Scripts\activate          (Windows) / source venv/bin/activate (macOS/Linux)
+   pip install -r requirements.txt
+   cp .env.example .env           # fill in real values
+   uvicorn app.main:app --reload --port 8000
+
+   Health check: curl http://localhost:8000/health
+
+Frontend:
+   cd frontend
+   npm install
+   cp .env.example .env.local     # fill in real values
+   # Set NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+   npm run dev
+
+   App: http://localhost:3000
+
+Both must be running simultaneously for a full local environment. The
+Supabase project can be shared between local and production — there is
+no local Supabase instance. Use the same project ref for both.
+
+---
+
+=== PART 7: ROLLBACK PROCEDURE ===
+
+Frontend (Vercel):
+   Vercel keeps all previous deployments. In Vercel Dashboard →
+   Deployments → find the last known-good deployment → click "..." →
+   Promote to Production.
+
+Backend (Render):
+   Render keeps deploy history. In Render Dashboard → your service →
+   Events → find the last successful deploy → click "Rollback to this
+   deploy". Alternatively, revert the commit in git and push to main.
+
+Database (Supabase):
+   Supabase does not provide automatic migration rollback. For schema
+   changes: write a compensating migration (e.g. DROP COLUMN if you added
+   one incorrectly) and apply it via `supabase db push` or the SQL Editor.
+   Point-in-time recovery is available on Pro tier only.
+
+---
+
+=== PART 8: KNOWN PRODUCTION GOTCHAS ===
+
+1. Render free tier cold starts: The backend sleeps after 15 minutes of
+   inactivity. The first request takes 30-60 seconds. This is expected
+   on the free plan and is visible as a timeout on the frontend. If this
+   is a problem for the demo, use the Render paid tier (Starter, $7/month)
+   which keeps the service always-on.
+
+2. ALLOWED_ORIGINS must match exactly: If the frontend is at
+   https://halqa.vercel.app but ALLOWED_ORIGINS is set to
+   https://halqa.vercel.app/ (trailing slash), CORS will fail. No trailing
+   slashes. Test with: curl -H "Origin: https://halqa.vercel.app" -I
+   https://<your-api>.onrender.com/health — look for Access-Control-Allow-Origin
+   in the response headers.
+
+3. Supabase Realtime must be enabled on the posts table: Go to
+   Supabase Dashboard → Realtime → Tables → toggle on public.posts.
+   Without this, the feed will not update in real time (posts only appear
+   on page refresh).
+
+4. GEMINI_API_KEY rate limit: The free tier allows 15 requests per minute.
+   If multiple posts are created rapidly (e.g. during a demo with multiple
+   accounts), some classification tasks may hit the rate limit. Posts fall
+   back to user-declared values gracefully — no crash, no error in the feed.
+
+5. JWT key format change: Supabase recently changed key formats from
+   eyJ... (JWT) to sb_publishable_... (anon) and sb_secret_... (service
+   role). Either format works — pydantic-settings reads them as plain
+   strings. If the Supabase dashboard shows the new format, use the new
+   format in both .env files.
+
+6. Supabase Storage bucket permissions: The verification-documents bucket
+   must be private (not public). If set to public by mistake, any uploaded
+   document becomes publicly accessible via its URL. Verify in Dashboard →
+   Storage → verification-documents → Policies — only service role should
+   have access.
+
+---
+
+=== PART 9: ENVIRONMENT VARIABLE REFERENCE ===
+
+FRONTEND (.env.local / Vercel project settings):
+
+  Variable                        Where to get it
+  ─────────────────────────────── ──────────────────────────────────────────
+  NEXT_PUBLIC_SUPABASE_URL        Supabase → Project Settings → API → URL
+  NEXT_PUBLIC_SUPABASE_ANON_KEY   Supabase → Project Settings → API → anon key
+  NEXT_PUBLIC_API_URL             Your Render service URL + /api/v1
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY    Output of: npx web-push generate-vapid-keys
+
+BACKEND (.env / Render environment):
+
+  Variable                        Where to get it
+  ─────────────────────────────── ──────────────────────────────────────────
+  SUPABASE_URL                    Supabase → Project Settings → API → URL
+  SUPABASE_ANON_KEY               Supabase → Project Settings → API → anon key
+  SUPABASE_SERVICE_ROLE_KEY       Supabase → Project Settings → API → service_role key
+  GEMINI_API_KEY                  https://aistudio.google.com/apikey
+  VAPID_PUBLIC_KEY                Output of: npx web-push generate-vapid-keys
+  VAPID_PRIVATE_KEY               Output of: npx web-push generate-vapid-keys
+  VAPID_EMAIL                     mailto:hello@halqa.pk (or your email)
+  INTERNAL_SERVICE_TOKEN          openssl rand -hex 16
+  ENVIRONMENT                     "development" or "production"
+  LOG_LEVEL                       INFO (production) / DEBUG (development)
+  ALLOWED_ORIGINS                 JSON array: ["https://halqa.vercel.app"]
