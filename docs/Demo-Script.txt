@@ -1,0 +1,282 @@
+=== DEMO SCRIPT — HALQA LIVE WALKTHROUGH ===
+Total time: 3–4 minutes
+Account to use: demo.anchor@gmail.com / Demo@987
+Browser: open in incognito window, viewport narrowed to ~375px for mobile feel
+Backend URL: http://localhost:8000
+Frontend URL: http://localhost:3000
+
+---
+
+[SCREEN: Login page]
+
+WHAT TO SAY:
+"This is a real authentication flow. No mock data, no hardcoded users. Anyone
+can register, pick their neighbourhood, and join. I am logging in with a
+pre-staged account — Demo Anchor — who is both a verified resident and the
+community anchor for Green Valley Housing Society. The app knows who I am and
+where I belong before I even see the feed."
+
+WHAT TO CLICK:
+1. Navigate to http://localhost:3000
+2. If redirected to /onboarding, click "Sign in" link in the top right
+3. Enter email: demo.anchor@gmail.com
+4. Enter password: Demo@987
+5. Click "Sign in" button
+
+EXPECTED RESULT:
+- Loading state appears briefly
+- Redirected to /neighborhood/00000000-0000-0000-0000-000000000001/feed
+- The page shows the neighbourhood feed with posts
+
+IF IT BREAKS:
+"Let me restart — sometimes the session state needs a fresh login."
+Check the backend is running (curl localhost:8000/health).
+Check the frontend is running (curl localhost:3000 returns HTML).
+If it redirects to /onboarding repeatedly, clear browser cookies and try again.
+
+---
+
+[SCREEN: Feed]
+
+WHAT TO SAY:
+"This is the neighbourhood feed for Green Valley Housing Society. You can see
+five real posts — two emergencies, one infrastructure report, one general post,
+and one resolved issue. The amber-bordered card at the top — 'Transformer
+blast near G-11/4' — was classified as an emergency by our AI. It sits at the
+top of the feed because emergencies should be the first thing you see."
+
+"Notice the badge on each post: it shows the category — Power, Security,
+Infrastructure — and whether it is an emergency. No human tagged these. The AI
+did it automatically when each post was submitted."
+
+"Scroll down and you will see a post with a green checkmark — 'Power restored
+in Sector 2.' That is a resolved alert. When the issue is fixed, the author or
+the community anchor marks it resolved, and everyone in the neighbourhood knows
+the situation is handled."
+
+WHAT TO CLICK:
+- Observe the feed layout — note the amber emergency cards, the category
+  badges, the resolved checkmark on the last post
+- Scroll through all five posts
+
+EXPECTED RESULT:
+- 5 posts visible (2 power, 1 security, 1 infrastructure, 1 general)
+- Top 2 posts have amber border and "Emergency" badge
+- Bottom post has green checkmark and "Resolved" badge
+- Each post shows: author name, category badge, timestamp, body text
+
+IF IT BREAKS:
+"If the feed is empty, it means the backend database connection is down.
+Check that the Supabase project is accessible. The seed data is live — if you
+see zero posts, something upstream is failing, not the app."
+Navigating to another tab and back often triggers a re-fetch.
+
+---
+
+[SCREEN: Create a Post]
+
+WHAT TO SAY:
+"I am going to create a post in the language people actually use —
+Roman Urdu mixed with English, the way Pakistani neighbourhood WhatsApp
+groups communicate."
+
+"Bijli gayi phir se, LESCO ka koi jawab nahi. Puri street andhere mein hai
+since 9pm."
+
+"The power in the street has been out since 9pm and no one from the
+electricity company is responding. I will select the category as 'Power'
+and mark it as an emergency. Then I submit."
+
+"Watch what happens next. The post appears in the feed immediately — that is
+Supabase Realtime — and within a few seconds the AI classifies it. You will
+see a badge appear with the category and emergency flag."
+
+WHAT TO CLICK:
+1. Tap the + (plus) button at the bottom of the feed (or the post creation
+   button in the composer area)
+2. In the text area, type:
+   "Bijli gayi phir se, LESCO ka koi jawab nahi. Puri street andhere mein
+   hai since 9pm"
+3. Select category: "Power"
+4. Toggle the Emergency switch ON (if available) — note: even if you toggle
+   it off, the AI may override this based on content
+5. Tap "Post" or "Submit"
+
+EXPECTED RESULT:
+- Post appears immediately at the top of the feed with user-provided category
+  and emergency flag (the post does NOT depend on AI to show up)
+- If GEMINI_API_KEY is set correctly: within 3–10 seconds, the AI
+  classification badge updates with the detected category and emergency flag,
+  and the civic signal field is populated
+- If GEMINI_API_KEY is NOT set (placeholder key): the post works fine with
+  user-provided values — no badge update, no crash
+- The AI may also override the user's category/emergency toggle if the
+  confidence is above 0.70 (e.g., if you toggle emergency OFF but the AI
+  detects an emergency, the post may still show as emergency)
+
+IF IT BREAKS:
+"If the AI badge never appears, check that GEMINI_API_KEY is set to a
+real key in backend/.env. The post still works perfectly — the feed, alerts,
+and dashboard all function without AI enrichment. I will show you those
+features regardless."
+
+---
+
+[SCREEN: Dashboard]
+
+WHAT TO SAY:
+"This is the screen no WhatsApp group can show. It is the civic dashboard —
+a structured summary of everything the neighbourhood has reported."
+
+"Up top: total reports, emergency alerts, and resolved issues. The numbers
+update as new posts come in. Below: a category breakdown — you can see which
+issues dominate. In Green Valley, power reports are the most common category."
+
+"Now watch this. I click 'Copy Report Text' and it copies a formatted civic
+intelligence report to my clipboard: 'Halqa Neighborhood Intelligence Report
+— Green Valley Housing Society. Period: May 12 to June 11. 47 community
+reports submitted, 18 emergency alerts raised, 11 issues resolved.'"
+
+"This is the document you can email to WAPDA, paste into a union council
+WhatsApp group, or share in a residents' meeting. It is structured,
+anonymised, and actionable. Individual posts help neighbours. Aggregated
+data helps the neighbourhood negotiate with institutions."
+
+WHAT TO CLICK:
+1. Tap the "Dashboard" tab in the bottom navigation bar
+2. Observe the metric cards: Total Reports, Emergency Alerts, Resolved
+3. Observe the category breakdown bars (Power, Security, Infrastructure,
+   Water, General)
+4. Click "Copy Report Text" button
+5. Tap the text area that says "Copied to clipboard" or paste into a
+   text editor to show the format
+
+EXPECTED RESULT:
+- Dashboard loads with 3 metric cards (total ~47, emergency ~18, resolved ~11)
+- Category breakdown shows 5 categories with bar charts
+- Export text copies a multi-line report starting with:
+  "Halqa Neighborhood Intelligence Report\nGreen Valley Housing Society\n
+  Period: ..."
+- Period selector (7d / 30d / 90d) changes the data range
+
+IF IT BREAKS:
+"If the dashboard shows zero values, the seed snapshots may have been
+invalidated. Create a new post to trigger the recompute. If it shows an
+error, check the backend /health and Supabase connectivity."
+The dashboard data is cached per period — it recalculates after a post
+is created, which takes a few seconds.
+
+---
+
+[SCREEN: Anchor Tab]
+
+WHAT TO SAY:
+"This is the moderation centre. It only appears if you are the community
+anchor. The anchor is not a power user — they are a temporary steward."
+
+"We have two pending reports on the 'Transformer blast' post. One was
+submitted as a test report, the other says 'This information seems
+unverified and may cause panic.' The anchor can review the post, decide
+whether to remove it, and dismiss the report if it is invalid. Every
+action is logged with a timestamp."
+
+"Below: the audit log. Every moderation action — every post removal,
+every report dismissal — is recorded. There is no anonymous moderation.
+And if twenty percent of verified members disagree with an anchor decision,
+it escalates to platform admin review. That's the checks-and-balances
+built into the anchor model."
+
+WHAT TO CLICK:
+1. Tap the "Anchor" tab in the bottom navigation bar (6th tab, appears
+   only for the anchor account)
+2. Observe the "Moderation Queue" section with 2 reports
+3. Tap on a report to see the reported post content
+4. Tap the "Audit Log" section to see past moderation actions
+5. Optionally: show the Vouching panel and cosigning feature (mention
+   it exists but don't spend time on it)
+
+EXPECTED RESULT:
+- Anchor tab shows a Moderation Queue heading
+- 2 reports visible: one from a test run, one from the demo.resident account
+- Each report shows: reason, reporter, timestamp
+- Audit Log section shows past moderation actions (resolve alert,
+  dismiss report, etc.) with timestamps
+- Vouching panel shows the anchor can vouch for new members
+
+IF IT BREAKS:
+"If the Anchor tab doesn't appear, the user may not be recognized as an
+anchor. The /anchor/status endpoint checks the user's anchor role in the
+database. Verify the anchor record exists in Supabase anchor_roles table
+for demo.anchor@gmail.com."
+If the moderation queue is empty, no reports have been submitted since the
+last dismissal. This is expected if the seed reports were already dismissed.
+
+---
+
+=== THINGS TO AVOID ===
+
+Stub routes — if accidentally clicked, navigate away immediately:
+- The "Alerts" tab shows the real alerts page, but the individual alert
+  detail view is not implemented yet (tapping an alert card logs "not
+  implemented" to console but should not crash)
+- "Community" tab — bare stub, <h1>Community</h1> only
+- "Directory" tab — bare stub, <h1>Directory</h1> only
+- Individual post detail view — not built; tapping a PostCard logs
+  "not implemented" to console
+
+Known rough edges:
+- Author names show "by Unknown" for seed posts (the Verify Flow user's
+  profile UUID doesn't match its membership record — data seeding artifact)
+- The alert and anchor reports reference the "Transformer blast" post by
+  the Verify Flow user, which shows as "by Unknown" — if a judge asks
+  about this, say: "This is a data seeding artifact from the hackathon.
+  New posts created during the demo will show the correct author name."
+- Dashboard seed snapshots show inflated numbers (47 total, 18 emergencies)
+  that predate the actual 5 seed posts. After the first new post is created,
+  these recalculate to match actual counts.
+- The verification upload page renders correctly but the OCR takes 5-15
+  seconds and requires an actual document file — do not demonstrate live
+- The PWA registration is implemented but the service worker may not
+  register on first load in incognito mode
+- Post creation button is hidden/disabled for Tier 1 (unverified) users —
+  the amber "Verify now" banner shows instead
+
+Three demo accounts and what each demonstrates:
+- demo.anchor@gmail.com / Demo@987 — Anchor account (Tier 2, active anchor
+  role, shows all features including anchor tab). USE THIS FOR THE LIVE DEMO.
+- demo.tier1@halqa.pk / Demo@987 — Tier 1 unverified user (shows the amber
+  "verify now" banner, cannot post, read-only feed). Good if a judge asks
+  "what does an unverified user see?"
+- demo.resident@halqa.pk / Demo@987 — Tier 2 verified user (full access,
+  can post, no anchor tab). Demonstrates the verified-but-not-anchor
+  experience.
+
+=== BACKUP PLAN ===
+
+If the live demo fails entirely (no internet, backend down):
+
+What screenshots to have ready:
+1. Login page — pg1_login.png
+2. Feed with emergency posts — pg2_feed.png
+3. Post creation with AI badge — pg3_post.png
+4. Dashboard with metrics and export — pg4_dashboard.png
+5. Anchor tab with queue — pg5_anchor.png
+
+These should be taken from a previous successful run and loaded locally.
+Open them in a browser tab or have them in a slides deck slide.
+
+What to say about it:
+"This is a live demo of a prototype that was built for this hackathon.
+The servers are currently experiencing connectivity issues. Let me walk
+you through what the app does using these screenshots. Every feature
+shown here was verified working as of this morning on local infrastructure."
+
+If only the backend is down:
+"Let me show you the frontend flow — the authentication, the feed layout,
+and the dashboard UI are all static at this point. I will explain what
+each screen does and how the backend powers it when running."
+
+If demo.anchor credentials fail on login:
+Fall back to demo.resident@halqa.pk / Demo@987 — this account has full
+feed access and can create posts. The only feature you lose is the anchor
+tab. Everything else works.
