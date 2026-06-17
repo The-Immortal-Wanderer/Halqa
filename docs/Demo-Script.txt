@@ -215,14 +215,15 @@ last dismissal. This is expected if the seed reports were already dismissed.
 
 === THINGS TO AVOID ===
 
-Stub routes — if accidentally clicked, navigate away immediately:
-- The "Alerts" tab shows the real alerts page, but the individual alert
-  detail view is not implemented yet (tapping an alert card logs "not
-  implemented" to console but should not crash)
-- "Community" tab — bare stub, <h1>Community</h1> only
-- "Directory" tab — bare stub, <h1>Directory</h1> only
-- Individual post detail view — not built; tapping a PostCard logs
-  "not implemented" to console
+Stub routes — if accidentally triggered, handle gracefully:
+- The "+" FAB on the Directory tab shows an "Add worker flow coming soon"
+  browser alert — tap Cancel and move on
+- Tapping an individual worker card is not implemented (no detail page)
+- Profile settings rows (Notification preferences, Privacy settings, About)
+  show "Coming soon" toast — mention it is intentionally deferred
+
+All main tabs (Feed, Alerts, Community, Directory, Anchor, Dashboard,
+Profile) are fully implemented and safe to navigate to.
 
 Known rough edges:
 - Author names show "by Unknown" for seed posts (the Verify Flow user's
@@ -240,6 +241,9 @@ Known rough edges:
   register on first load in incognito mode
 - Post creation button is hidden/disabled for Tier 1 (unverified) users —
   the amber "Verify now" banner shows instead
+- Tapping a worker card on the Directory tab has no action (no detail page)
+- The "+" FAB on the Directory tab shows a browser alert ("Add worker flow
+  coming soon") — tap Cancel to dismiss
 
 Three demo accounts and what each demonstrates:
 - demo.anchor@gmail.com / Demo@987 — Anchor account (Tier 2, active anchor

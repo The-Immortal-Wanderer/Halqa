@@ -86,8 +86,9 @@ API (Gemma 4 31B) in a background task. The prompt is
 Pakistani-specific — it understands terms like "bijli gai", "LESCO", "WAPDA",
 "chori", "mohalla", "sadak", "transformer blast", and handles English, Urdu
 script, and Roman Urdu interchangeably. It classifies the post into one of
-three categories — emergency, community, or general — and assigns a confidence
-score (0.0 to 1.0).
+five categories — power, security, infrastructure, water, or general — and
+separately sets an emergency flag (true/false), with a confidence score
+(0.0 to 1.0) for the overall classification.
 
 If the confidence is 0.70 or above, the system trusts the AI classification
 and overrides the user-declared category if needed. Below 0.70, the user's
@@ -185,13 +186,21 @@ BUILT AND WORKING (from verified audit results):
   emergency sorting (emergencies at top), category filtering, resolved state
 - Post creation — category selector, emergency toggle, body text with
   character count, auto-classified by AI on submit
+- Post detail view — tapping any post card navigates to a full detail page
+  with back navigation
 - Emergency alerts — 2 seed emergencies in the feed, alert banner, AI
   classification badge on each post
+- Alerts tab — dedicated tab showing emergency posts from backend, loading
+  skeleton, empty state, count subheader
 - Civic dashboard — metric cards, category breakdown bars, resolution rate,
   recent emergencies list, one-click copy of export text
 - Anchor role — status endpoint returns is_anchor, anchor tab shows in
   bottom nav, moderation queue with pending reports, audit log, ability to
   resolve alerts and dismiss reports, two-signature vouching system
+- Community tab — member list with verified member count, avatar initials,
+  tier badge, loading skeleton, and empty state
+- Worker directory — listing view with service type filter, worker cards,
+  loading skeleton, empty state; worker add flow is a stub ("coming soon")
 - Post reporting — overflow menu on posts lets verified members report
   content, reports appear in anchor queue
 - Dashboard snapshot invalidation — creating a new post triggers snapshot
@@ -215,7 +224,6 @@ Rough edges (working but imperfect):
 
 DESIGNED BUT NOT BUILT:
 
-- Worker directory (DB schema exists, router commented out in backend)
 - Full Urdu interface (Urdu text exists as cultural signal in the UI, but
   there is no complete Urdu/RTL interface)
 - Offline/low-connectivity support (PWA service worker registered but no
@@ -226,6 +234,10 @@ DESIGNED BUT NOT BUILT:
 - Push notifications (simulated via Supabase Realtime in-app — no FCM/APNS
   or Web Push implementation)
 - Mobile native app (it is a PWA/web app)
+- Worker listing detail page and worker add flow (directory listings are
+  visible; tapping a worker card and adding a new worker are not built)
+- Profile settings (notification preferences, privacy settings, about —
+  rows present but show "coming soon" toast)
 
 If a judge asks "can I see X" and X is not built, say:
 
@@ -509,8 +521,8 @@ THINGS TO AVOID SHOWING LIVE:
   demo, and requires an actual document file)
 - The onboarding flow (account creation is too slow for demo time — the
   pre-staged account avoids this)
-- Stub routes: Alerts, Community, Directory tabs render bare headings — if
-  accidentally clicked, navigate away immediately without commentary
+- Worker add flow — the "+" FAB on the directory tab shows an "Add worker
+  flow coming soon" alert; navigate away if accidentally tapped
 
 WHAT TO SAY WHILE SWITCHING BETWEEN SCREENS:
 - Login → Feed: "Real auth, real session — the app knows your neighbourhood."
