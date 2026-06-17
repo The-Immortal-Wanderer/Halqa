@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   ArrowRight,
   SignOut,
+  WarningCircle,
 } from "@phosphor-icons/react";
 
 interface MembershipInfo {
@@ -47,9 +48,12 @@ export default function ProfilePage() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
   const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         const supabase = createClient();
@@ -58,23 +62,17 @@ export default function ProfilePage() {
         } = await supabase.auth.getSession();
 
         if (!session) {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
           return;
         }
 
         const user = session.user;
-        setEmail(user.email ?? null);
-        setDisplayName(user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? null);
-
-        // Get tier from verification status
-        const vRes = await verificationApi.getStatus();
-        if (vRes.data?.status === "approved") {
-          setTier(vRes.data.current_tier ?? "tier_2");
-        } else {
-          setTier("tier_1");
+        if (!cancelled) {
+          setEmail(user.email ?? null);
+          setDisplayName(user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? null);
         }
 
-        // Get membership from Supabase directly
+        // Get membership tier + neighborhood from Supabase directly
         const memRes = await supabase
           .from("neighborhood_members")
           .select("neighborhood_id, tier")
@@ -82,24 +80,32 @@ export default function ProfilePage() {
           .eq("is_active", true)
           .maybeSingle();
 
-        if (memRes.data) {
+        if (!cancelled && memRes.data) {
           const membership = memRes.data as MembershipInfo;
           setTier(membership.tier);
 
-          // Fetch neighborhood name
+          // Fetch neighborhood name + member count
           const nRes = await neighborhoodsApi.getById(membership.neighborhood_id);
-          if (nRes.data?.name) {
-            setNeighborhoodName(nRes.data.name);
+          if (!cancelled) {
+            if (nRes.data?.name) {
+              setNeighborhoodName(nRes.data.name);
+            }
+            if (nRes.data?.member_count !== undefined) {
+              setMemberCount(nRes.data.member_count);
+            }
           }
         }
-      } catch {
-        // Gracefully degrade
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "Couldn't load profile");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     load();
+    return () => { cancelled = true; };
   }, []);
 
   const handleSignOut = useCallback(async () => {
@@ -116,6 +122,30 @@ export default function ProfilePage() {
   const initials = displayName?.charAt(0).toUpperCase() ?? "?";
 
   if (loading) return <ProfileSkeleton />;
+
+  // Error state
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="border-b border-halqa-sand-mid px-4 pb-4 pt-4">
+          <h1 className="text-[22px] font-semibold text-halqa-ink">Profile</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+          <WarningCircle size={40} className="text-halqa-danger" />
+          <p className="mt-3 text-[15px] text-halqa-ink-mid">
+            Couldn&apos;t load profile
+          </p>
+          <p className="mt-1 text-[13px] text-halqa-ink-light">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-halqa-teal px-6 py-2 text-sm font-semibold text-white"
+          >
+            Try again
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white pb-8">
@@ -160,6 +190,11 @@ export default function ProfilePage() {
           <p className="mt-1 text-[15px] font-medium text-halqa-ink">
             {neighborhoodName}
           </p>
+          {memberCount !== null ? (
+            <p className="mt-0.5 text-[13px] text-halqa-ink-light">
+              {memberCount} {memberCount === 1 ? "member" : "members"}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -176,7 +211,7 @@ export default function ProfilePage() {
       {/* Settings rows */}
       <button
         onClick={() => showToast("Coming soon")}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
+        className="flex w-full min-h-[48px] items-center justify-between px-4 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
       >
         <span>Notification preferences</span>
         <ArrowRight size={16} className="text-halqa-ink-light" />
@@ -184,7 +219,7 @@ export default function ProfilePage() {
 
       <button
         onClick={() => showToast("Coming soon")}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
+        className="flex w-full min-h-[48px] items-center justify-between px-4 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
       >
         <span>Privacy settings</span>
         <ArrowRight size={16} className="text-halqa-ink-light" />
@@ -192,7 +227,7 @@ export default function ProfilePage() {
 
       <button
         onClick={() => showToast("Coming soon")}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
+        className="flex w-full min-h-[48px] items-center justify-between px-4 text-left text-[15px] text-halqa-ink-mid transition-colors hover:bg-halqa-sand"
       >
         <span>About Halqa</span>
         <ArrowRight size={16} className="text-halqa-ink-light" />
@@ -205,7 +240,7 @@ export default function ProfilePage() {
       <div className="px-4 pb-4 pt-4">
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-halqa-danger-bg px-4 py-3 text-[15px] font-medium text-halqa-danger transition-colors hover:bg-halqa-danger-bg"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-0 px-4 py-3 text-[15px] font-medium text-halqa-danger transition-colors hover:bg-halqa-danger-bg"
         >
           <SignOut size={16} />
           Sign out

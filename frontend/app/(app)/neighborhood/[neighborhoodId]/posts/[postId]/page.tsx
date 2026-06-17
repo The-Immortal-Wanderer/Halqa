@@ -62,6 +62,8 @@ function SkeletonDetail() {
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
+  // Type assertions required — useParams() returns string | string[]
+  // but dynamic route params are always string in this context
   const neighborhoodId = params.neighborhoodId as string;
   const postId = params.postId as string;
 
@@ -102,6 +104,8 @@ export default function PostDetailPage() {
       if (res.data?.is_anchor) {
         setIsAnchor(true);
       }
+    }).catch(() => {
+      // Silently fail — anchor status is non-critical UI enhancement
     });
   }, [neighborhoodId]);
 
@@ -129,15 +133,22 @@ export default function PostDetailPage() {
     return (
       <main className="min-h-screen bg-white">
         <div className="px-4 pb-4 pt-4">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-halqa-ink-mid"
-          >
-            <ArrowLeft size={20} />
-            <span className="text-[13px]">Feed</span>
-          </button>
-        </div>
-        <SkeletonDetail />
+        <button
+          onClick={() => {
+            // Fallback to feed if there's no history (direct URL entry)
+            if (window.history.length <= 1) {
+              router.push(`/neighborhood/${neighborhoodId}/feed`);
+            } else {
+              router.back();
+            }
+          }}
+          className="flex items-center gap-1 text-halqa-ink-mid"
+        >
+          <ArrowLeft size={20} />
+          <span className="text-[13px]">Feed</span>
+        </button>
+      </div>
+      <SkeletonDetail />
       </main>
     );
   }
@@ -148,7 +159,13 @@ export default function PostDetailPage() {
       <main className="min-h-screen bg-white">
         <div className="px-4 pb-4 pt-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length <= 1) {
+                router.push(`/neighborhood/${neighborhoodId}/feed`);
+              } else {
+                router.back();
+              }
+            }}
             className="flex items-center gap-1 text-halqa-ink-mid"
           >
             <ArrowLeft size={20} />
@@ -171,7 +188,13 @@ export default function PostDetailPage() {
       <main className="min-h-screen bg-white">
         <div className="px-4 pb-4 pt-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length <= 1) {
+                router.push(`/neighborhood/${neighborhoodId}/feed`);
+              } else {
+                router.back();
+              }
+            }}
             className="flex items-center gap-1 text-halqa-ink-mid"
           >
             <ArrowLeft size={20} />
@@ -195,7 +218,13 @@ export default function PostDetailPage() {
       <main className="min-h-screen bg-white">
         <div className="px-4 pb-4 pt-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length <= 1) {
+                router.push(`/neighborhood/${neighborhoodId}/feed`);
+              } else {
+                router.back();
+              }
+            }}
             className="flex items-center gap-1 text-halqa-ink-mid"
           >
             <ArrowLeft size={20} />
@@ -212,11 +241,17 @@ export default function PostDetailPage() {
       {/* Back button */}
       <div className="sticky top-0 z-10 border-b border-halqa-sand-mid bg-white px-4 py-3">
         <button
-          onClick={() => router.back()}
+          onClick={() => {
+            if (window.history.length <= 1) {
+              router.push(`/neighborhood/${neighborhoodId}/feed`);
+            } else {
+              router.back();
+            }
+          }}
           className="flex items-center gap-1 text-halqa-ink-mid hover:text-halqa-ink"
         >
-            <ArrowLeft size={20} />
-            <span className="text-[13px]">Feed</span>
+          <ArrowLeft size={20} />
+          <span className="text-[13px]">Feed</span>
         </button>
       </div>
 
