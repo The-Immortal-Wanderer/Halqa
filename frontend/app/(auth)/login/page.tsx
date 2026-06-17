@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getRedirectTarget } from "@/lib/auth/getRedirectTarget";
 import { env } from "@/lib/env";
 
 export default function LoginPage() {
@@ -39,7 +40,9 @@ export default function LoginPage() {
         refresh_token: json.data.refresh_token,
       });
 
-      router.push("/neighborhoods");
+      // Redirect to correct landing based on membership
+      const { path } = await getRedirectTarget(supabase);
+      router.push(path);
     } catch {
       setError("Unable to connect. Please check your connection and try again.");
     } finally {

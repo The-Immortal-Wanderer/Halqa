@@ -7,27 +7,36 @@ from uuid import UUID
 
 from supabase import Client
 
+from app.db.client import new_thread_safe_client
+
 logger = logging.getLogger(__name__)
 
 
 async def get_active(db: Client, user_id: UUID, neighborhood_id: UUID) -> dict | None:
     """Get the user's active membership for a specific neighborhood.
 
-    Runs the sync ``.execute()`` in a thread to avoid blocking the event
-    loop, per the ``async/await throughout`` mandate.
+    Uses its own fresh Supabase client inside the thread-pool lambda to
+    avoid sharing the cached client's HTTPX session (which would produce
+    406 on the first cross-thread request). The ``db`` parameter is kept
+    only for signature compatibility with ``Depends(get_db)``.
     """
-    result = await asyncio.to_thread(
-        lambda: (
-            db.table("neighborhood_members")
-            .select("*")
-            .eq("user_id", str(user_id))
-            .eq("neighborhood_id", str(neighborhood_id))
-            .eq("is_active", True)
-            .maybe_single()
-            .execute()
-        )
-    )
-    return result.data if result else None
+    def _fetch():
+        client = new_thread_safe_client()
+        try:
+            result = (
+                client.table("neighborhood_members")
+                .select("*")
+                .eq("user_id", str(user_id))
+                .eq("neighborhood_id", str(neighborhood_id))
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            return result.data if result and result.data else None
+        finally:
+            client.auth.sign_out()
+
+    return await asyncio.to_thread(_fetch)
 
 
 async def get_any_active(db: Client, user_id: UUID) -> list[dict]:

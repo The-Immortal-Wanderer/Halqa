@@ -76,7 +76,7 @@ async def register(
                 ErrorCode.USER_ALREADY_EXISTS,
                 "A user with this email already exists",
             )
-        logger.exception("Supabase create_user failed")
+        logger.exception("Supabase admin create_user failed")
         raise api_error(
             503,
             ErrorCode.SERVICE_UNAVAILABLE,

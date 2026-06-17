@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ShieldCheck } from "@phosphor-icons/react";
 import { verificationApi } from "@/lib/api/verification";
+import { neighborhoodsApi } from "@/lib/api/neighborhoods";
 import { useDashboard } from "@/hooks/useDashboard";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const params = useParams();
   const neighborhoodId = params.neighborhoodId as string;
   const [tier, setTier] = useState<number | "loading">("loading");
+  const [neighborhoodCity, setNeighborhoodCity] = useState<string>("");
 
   const { data, loading, error, periodType, setPeriodType } =
     useDashboard(neighborhoodId);
@@ -39,6 +41,12 @@ export default function DashboardPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    neighborhoodsApi.getById(neighborhoodId).then((res) => {
+      if (res.data?.city) setNeighborhoodCity(res.data.city);
+    });
+  }, [neighborhoodId]);
 
   const handlePeriodChange = useCallback(
     (period: DashboardPeriod) => {
@@ -203,7 +211,7 @@ export default function DashboardPage() {
             neighborhoodName={
               data.neighborhood_name ?? "Unknown Neighborhood"
             }
-            city=""
+            city={neighborhoodCity}
             snapshotData={{
               period_start: data.period_start,
               period_end: data.period_end,

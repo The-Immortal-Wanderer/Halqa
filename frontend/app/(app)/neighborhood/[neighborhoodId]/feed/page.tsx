@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck, PencilSimple } from "@phosphor-icons/react";
 import { useParams } from "next/navigation";
 import { verificationApi } from "@/lib/api/verification";
+import { neighborhoodsApi } from "@/lib/api/neighborhoods";
 import { useFeed } from "@/hooks/useFeed";
 import { FilterPills } from "@/components/feed/FilterPills";
 import { FeedList } from "@/components/feed/FeedList";
@@ -20,6 +21,7 @@ export default function FeedPage() {
   const [tier, setTier] = useState<number | "loading">("loading");
   const [filterCategory, setFilterCategory] = useState("");
   const [showSheet, setShowSheet] = useState(false);
+  const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
 
   const { posts, loading, error, activeEmergency, clearEmergency } = useFeed(
     neighborhoodId,
@@ -41,6 +43,12 @@ export default function FeedPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    neighborhoodsApi.getById(neighborhoodId).then((res) => {
+      if (res.data?.name) setNeighborhoodName(res.data.name);
+    });
+  }, [neighborhoodId]);
 
   const showTier1Banner = tier === 1;
   const canPost = tier !== 1 && tier !== "loading";
@@ -120,7 +128,7 @@ export default function FeedPage() {
         open={showSheet}
         onClose={() => setShowSheet(false)}
         neighborhoodId={neighborhoodId}
-        neighborhoodName="Green Valley"
+        neighborhoodName={neighborhoodName ?? "your neighborhood"}
         onPostCreated={handlePostCreated}
       />
     </div>

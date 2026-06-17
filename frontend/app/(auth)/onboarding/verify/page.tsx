@@ -72,7 +72,11 @@ export default function VerificationEntryPage() {
   }, [neighborhoodId, joinStatus]);
 
   function handleSkip() {
-    router.push("/feed");
+    if (neighborhoodId) {
+      router.push(`/neighborhood/${neighborhoodId}/feed`);
+    } else {
+      router.push("/onboarding");
+    }
   }
 
   function handleUpload() {
