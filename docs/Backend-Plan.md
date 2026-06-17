@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** June 2026
-**Stack:** Python 3.11+, FastAPI, Supabase (service role), Anthropic API
+**Stack:** Python 3.11+, FastAPI, Supabase (service role), Gemini API
 **Hosting:** Render (free tier for prototype)
 
 Read ARCHITECTURE.md for API contract, authentication flow, and shared type
@@ -44,7 +44,7 @@ backend/
 │   │   ├── membership_service.py
 │   │   ├── verification_service.py
 │   │   ├── post_service.py
-│   │   ├── classification_service.py   ← AI classification (Anthropic API)
+│   │   ├── classification_service.py   ← AI classification (Gemini API)
 │   │   ├── dashboard_service.py
 │   │   ├── worker_service.py
 │   │   ├── anchor_service.py
@@ -99,8 +99,8 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_anon_key: str
 
-    # Anthropic
-    anthropic_api_key: str
+    # Gemini
+    gemini_api_key: str
 
     # Web Push (VAPID)
     vapid_public_key: str
@@ -793,7 +793,7 @@ post is created and its output determines whether an emergency notification
 fires. The prompt must handle Pakistani mixed-language content.
 
 ```python
-import anthropic
+from google import genai
 from app.core.config import get_settings
 from app.schemas.post import PostCategory, AIClassification
 
@@ -840,18 +840,18 @@ async def classify_post(
     category: PostCategory
 ) -> dict:
     """
-    Classifies a post using the Anthropic API.
+    Classifies a post using the Gemini API.
     Returns classification result dict.
     Never raises — returns a safe fallback on any API error.
     """
     settings = get_settings()
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = genai.Client(api_key=settings.gemini_api_key)
 
     user_message = f"Post category declared by author: {category.value}\n\nPost content:\n{content}"
 
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="gemma-4-31b-it",
             max_tokens=200,
             system=CLASSIFICATION_PROMPT,
             messages=[{"role": "user", "content": user_message}]
@@ -940,7 +940,7 @@ async def upload_document(
 async def run_ocr_and_decide(db, storage, record, doc, declared_address: str):
     # 1. Generate signed URL for the uploaded document (1 hour expiry)
     signed_url = await storage_service.get_signed_url(doc.storage_path)
-    # 2. Call OCR service (Claude vision via Anthropic API)
+    # 2. Call OCR service (Gemini vision)
     ocr_result = await ocr_service.extract_address(signed_url, declared_address)
     # 3. Apply decision logic:
     #    - confidence >= 0.75: auto-approve → set status='approved', upgrade tier to 2
@@ -996,12 +996,12 @@ and rejection_reason="document_unreadable".
 """
 
 async def extract_address(signed_url: str, declared_address: str) -> dict:
-    client = anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key)
+    client = genai.Client(api_key=get_settings().gemini_api_key)
     prompt = DOCUMENT_OCR_PROMPT.format(declared_address=declared_address)
 
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="gemma-4-31b-it",
             max_tokens=300,
             messages=[{
                 "role": "user",
@@ -1395,7 +1395,7 @@ uvicorn[standard]==0.30.0
 pydantic==2.7.0
 pydantic-settings==2.3.0
 supabase==2.5.0
-anthropic==0.30.0
+google-genai>=1.0.0
 python-jose[cryptography]==3.3.0   # JWT validation
 httpx==0.27.0                      # Async HTTP client
 python-multipart==0.0.9            # File uploads
@@ -1435,7 +1435,7 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
@@ -1480,7 +1480,7 @@ Build in this sequence. Each step depends on the previous.
 8. **Posts router + service + repo** — feed, create, resolve, flag. The create flow
    must fire async classification.
 
-9. **Classification service** — AI prompt, Anthropic API integration, post update,
+9. **Classification service** — AI prompt, Gemini API integration, post update,
    emergency notification trigger. Test with Pakistani mixed-language content samples.
 
 10. **Notification service** — Web Push setup, VAPID key generation, subscription

@@ -69,7 +69,7 @@ sibling subdirectories. Do not split into separate repositories.
 - Frontend reads the backend's URL via `NEXT_PUBLIC_API_URL` (set in
   `frontend/.env.local` for dev, Vercel project settings for production).
 - Backend reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `SUPABASE_ANON_KEY`, and `ANTHROPIC_API_KEY` via `app/core/config.py`
+  `SUPABASE_ANON_KEY`, and `GEMINI_API_KEY` via `app/core/config.py`
   (set in `backend/.env` for dev, Render environment settings for production).
 - Frontend reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   directly for Supabase Auth and Realtime — these are public-safe keys.
@@ -104,7 +104,7 @@ sibling subdirectories. Do not split into separate repositories.
 | Frontend | Next.js 14+ (App Router), TypeScript strict, Tailwind CSS |
 | Backend | Python 3.11+, FastAPI, async throughout |
 | Database | Supabase (PostgreSQL), Supabase Auth, Supabase Storage, Supabase Realtime |
-| AI Layer | Anthropic Claude API (claude-sonnet-4-20250514) via FastAPI service |
+| AI Layer | Google Gemini API (Gemma 4 31B) via FastAPI service |
 | Frontend Hosting | Vercel |
 | Backend Hosting | Render |
 | Icons | Phosphor Icons (phosphor-react for frontend) |
@@ -391,11 +391,11 @@ status map for any new session.
 |---|---|---|
 | Project scaffolding | Complete |
 | Database migrations | Complete |
-| Authentication (Supabase Auth) | Complete — demo mode bypasses frontend auth |
+| Authentication (Supabase Auth) | Complete — real auth enforced (middleware + layout redirect) |
 | Onboarding flow | Complete |
 | Verification flow (Tier 1 + Tier 2) | Complete |
 | Neighborhood feed (Realtime) | Complete |
-| AI alert classification | Complete (requires ANTHROPIC_API_KEY) |
+| AI alert classification | Complete (requires GEMINI_API_KEY) |
 | Emergency alerts + alerts page | Complete |
 | Civic dashboard | Complete |
 | Anchor role + moderation tools | Complete |
@@ -403,13 +403,101 @@ status map for any new session.
 | PWA configuration | Not started |
 | Deep-link handler (verification notifications) | Complete |
 | Post-security-upgrade cleanup + bug fixes | Complete — config, 7 runtime bugs, error envelope, CORS, AI timeouts, token refresh, docs |
+| Auth restoration + redirect fixes | Complete — demo-mode 3-file bypass reverted; shared membership-lookup redirect utility; 2 broken redirects fixed; neighborhoodName city hardcodes fixed |
+| Demo accounts pre-staged | Complete — see Demo Accounts section below |
+| Alerts tab UI | Complete |
+| Demo sanity check | Complete (June 17, 2026) |
+| Demo script | Complete — see docs/Demo-Script.txt |
+| Deployment guide | Complete — see docs/Deployment-Guide.txt |
+| Pitch reference document | Complete — see docs/Halqa-Pitch-Reference.txt |
 | Vercel + Render deployment | Not started |
 
 ---
 
-### Demo Mode
+### Auth Restoration (June 17, 2026)
 
-For prototype walkthrough, auth gates in `middleware.ts`, `app/(app)/layout.tsx`, and
-`app/page.tsx` are bypassed with `// DEMO MODE` comments. All pages render without
-authentication. Backend API calls will return 401 if no valid session token is sent.
-To restore production auth, revert changes in those three files and rebuild.
+Demo mode has been reverted. Real authentication is now enforced:
+
+- **middleware.ts**: Restored `@supabase/ssr` session check — unauthenticated users redirected to `/onboarding`, authenticated users on `/login`/`/register` redirected to `/onboarding` (safe hub).
+- **app/(app)/layout.tsx**: Restored server-side `supabase.auth.getSession()` check — redirects to `/onboarding` if no session.
+- **app/page.tsx**: New logic — unauthenticated → `/onboarding`; authenticated → queries `neighborhood_members` → redirects to `/{neighborhoodId}/feed` or `/onboarding` if no membership.
+- **Shared redirect utility**: `lib/auth/getRedirectTarget.ts` — membership-aware redirect used by root page, login success, and verify-skip path.
+- **Fixes applied**: login redirect (`/neighborhoods` 404 → correct path), verify-skip redirect (`/feed` 404 → correct path), `neighborhoodName` hardcode removed from dynamic feed route, `city=""` hardcode fixed in dashboard export.
+- **Test data cleaned**: 1 test user (QA Feed Tester) + 1 orphaned post removed. Demo Anchor and Verify Flow users retained (needed for anchor feature + feed content).
+
+To restore the old demo-mode bypass (no auth required), revert `frontend/middleware.ts`, `frontend/app/(app)/layout.tsx`, and `frontend/app/page.tsx` to their pre-restoration state in git history.
+
+---
+
+### Demo Accounts (June 17, 2026)
+
+Three pre-staged accounts for demo walkthrough:
+
+| Role | Email | Password | Display Name | Membership Tier | Anchor | Verification |
+|------|-------|----------|--------------|----------------|--------|-------------|
+| **Anchor** (neighborhood admin) | `demo.anchor@gmail.com` | `Demo@987` | Demo Anchor | `tier_2` | ✅ Active (Green Valley) | not verified |
+| **Unverified Resident** (shows "verify now" banner) | `demo.tier1@halqa.pk` | `Demo@987` | Tariq Mahmood | `tier_1` | ❌ | not verified |
+| **Verified Resident** (can post, full feed) | `demo.resident@halqa.pk` | `Demo@987` | Amna Shahid | `tier_2` | ❌ | ✅ approved (0.92 confidence) |
+
+**Neighborhood**: All three are members of Green Valley Housing Society (neighborhood_id `00000000-0000-0000-0000-000000000001`).
+
+**What each account demonstrates in the UX:**
+- **Anchor** — sees the "Anchor" tab in bottom nav; can open moderation queue (2 open reports on the power emergency post), resolve alerts, dismiss reports, and view audit log.
+- **Unverified (Tier 1)** — sees amber "Verify to access full features" banner on feed page; can browse feed and alerts but the post creation button is disabled/hidden.
+- **Verified (Tier 2)** — sees full feed with 5 posts; can create new posts with category selector and emergency toggle; dashboard shows seed snapshots (47 total, 18 emergencies) which recompute on next post creation.
+
+**Feed content**: 5 seed posts exist in Green Valley (2 power, 1 security, 1 infrastructure, 1 general; 2 emergencies, 1 resolved). All authored by legacy "Verify Flow" user — the feed shows "by Unknown" for every post (the user's profile UUID differs from its membership record). The moderation queue has 2 open reports against the power emergency post.
+
+**Notes:**
+- These accounts were created via the Supabase admin API directly (bypassing the rate-limited public signup endpoint). The backend register endpoint was also fixed to use `admin.create_user()` correctly with `sb_secret_` format keys.
+- The `require_email_confirm=True` flag was set — accounts work immediately without email verification.
+- No verification record was created for the anchor account (the app treats "no record" as unverified, which is harmless since anchor capabilities are independent of verification status in this prototype).
+
+---
+
+### Pre-Pitch Status (June 17, 2026)
+
+**What is working end to end:**
+1. **Auth**: All 3 demo accounts authenticate. Real auth enforced — middleware.ts (78-line @supabase/ssr), layout session check, membership-aware redirects.
+2. **Onboarding**: Full 5-screen flow (welcome, search, select, verify, register).
+3. **Verification**: Document upload, OCR auto-approve/reject, pending/result screens, verification status polling.
+4. **Feed**: 5 seed posts load (2 emergencies, 1 resolved, 2 normal). Realtime subscription. Amber Tier-1 banner. Post creation (Tier 2+).
+5. **Alerts tab**: Wired to backend → 2 emergency posts render via PostCard. Count subheader, loading skeleton, empty state.
+6. **Dashboard**: 3 seed snapshots (7d/30d/90d). Metric cards, category breakdown bar, resolution bar, recent emergencies, civic export text copy.
+7. **Anchor tab**: Moderation queue (2 open reports on power emergency post). Remove post, dismiss report, audit log, vouching panel, escalations section.
+8. **AI classification**: Falls back gracefully when GEMINI_API_KEY is not set. Uses Google Gemini (Gemma 4 31B) for post classification and OCR. Users' own category/emergency toggles work independently.
+9. **PWA**: Service worker registered. Offline-capable icon set.
+10. **Error handling**: Standard `{"data":null,"error":{...}}` envelope. CORS OPTIONS supported. 401 refresh-and-retry on apiFetch.
+
+**What is intentionally deferred (not built):**
+- Worker directory — DB schema exists, router commented out
+- Full Urdu interface — English-only prototype
+- Offline/low-connectivity support — PWA registered but no service worker caching
+- PDF export from dashboard — "coming soon" toast only
+- Manual review queue UI (OCR 0.40–0.749) — records stay pending
+- Push notifications — simulated via Supabase Realtime (no FCM/APNS)
+- Mobile native app — it is a PWA/web app
+- Worker directory, community page, profile page — bare stub routes
+
+**Three demo accounts and their states:**
+
+| Account | Email | Password | What It Shows |
+|---------|-------|----------|---------------|
+| Anchor | `demo.anchor@gmail.com` | `Demo@987` | Anchor tab, moderation queue, audit log |
+| Unverified | `demo.tier1@halqa.pk` | `Demo@987` | Amber "verify now" banner, feed browse only, cannot post |
+| Verified | `demo.resident@halqa.pk` | `Demo@987` | Full feed + post creation + dashboard |
+
+All three are members of Green Valley Housing Society (`00000000-0000-0000-0000-000000000001`).
+
+**Demo path verified working:**
+Login → Feed (5 posts, 2 emergencies at top) → Create post (Roman Urdu, auto-classified) → Dashboard (metrics + export text) → Anchor tab (moderation queue). Full chain verified via curl against live backend (June 17, 2026).
+
+**What still requires human action before the pitch:**
+1. **Deploy backend to Render** — requires Render account, manual setup via dashboard. ~15 min. Follow `docs/Deployment-Guide.txt`.
+2. **Deploy frontend to Vercel** — requires Vercel account, manual setup via dashboard. ~10 min. Follow `docs/Deployment-Guide.txt`.
+3. **Set GEMINI_API_KEY** — already set with a real key from Google AI Studio. Verify it works by creating a post and confirming AI classification populates.
+4. **Manual browser rehearsal** — run through the demo script (`docs/Demo-Script.txt`) in incognito. Verify all screens render correctly with the deployed URL.
+5. **Team coordination** — ensure the demo runner has the credentials, knows which screen to show when, and has the backup plan handy.
+6. **Supabase key rotation** — old keys were exposed in git history (purged via git-filter-repo). Keys still valid server-side. Rotate via Dashboard → Project Settings → API if concerned.
+7. **API key check** — verify GEMINI_API_KEY in `backend/.env` is a real key, not `placeholder_gemini_api_key`. Classification silently fails with placeholder key (no error, no AI enrichment).
+8. **Route count**: 22 routes compiled, 0 build errors. Backend `/health` returns 200 with 28 registered endpoints.

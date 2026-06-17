@@ -1,7 +1,7 @@
-"""AI classification service using the Anthropic Claude API.
+"""AI classification service using Google Gemini API (Gemma 4 31B).
 
 This module contains:
-- ``classify_post`` — classifies a neighborhood post as emergency/community/general
+- ``classify_post`` — classifies a neighborhood post for category and emergency level
 
 Handles Pakistani mixed-language content (English, Urdu, Roman Urdu).
 All errors are caught and return safe fallbacks — never propagate to the caller.
@@ -10,95 +10,113 @@ All errors are caught and return safe fallbacks — never propagate to the calle
 import asyncio
 import json
 import logging
+from google import genai
+from google.genai import types
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-CLASSIFICATION_PROMPT = """
-You are an AI assistant for Halqa, a neighborhood coordination platform in Pakistan.
-Your task is to classify a community post into one of three categories:
+CLASSIFICATION_PROMPT = """You are a civic alert classifier for Pakistani neighborhoods.
+Classify the following community post and return ONLY a JSON object with no other text.
 
-- "emergency": Requires immediate neighbor attention. Examples: power outage (bijli gai),
-  robbery or theft (chori), fire (aag), medical emergency, dangerous gas leak, flooding,
-  suspicious armed individual, crime in progress.
+Post: {body}
 
-- "community": Neighborhood coordination that is important but not urgent. Examples:
-  scheduled water shutdown, road maintenance, community meeting, lost pet, delivery
-  collection request, general safety notice, service worker recommendation.
+The post's declared category is: {category}. This is what the author selected.
+Use it as context but overrule if the content clearly contradicts it.
 
-- "general": Everyday neighborhood conversation. Examples: greetings, casual questions,
-  lost and found (non-urgent), food recommendations, general chit-chat.
+Rules:
+- category must be one of: power, security, infrastructure, water, general
+- is_emergency: true only for urgent threats to safety or essential services
+- language_detected: en, ur, or mixed (Roman Urdu counts as mixed)
+- confidence: 0.0 to 1.0
+- civic_signal: one sentence summary suitable for a union council report
 
-The post may be written in English, Urdu (Arabic script), Roman Urdu (Urdu words
-written in Latin letters), or a mix of these. Common Pakistani terms for emergencies:
-- bijli gai / bijli nahi / load shedding = power outage (can be emergency if transformer
-  failure, not emergency if routine load shedding)
-- chori / daaka / robber = theft/robbery (always emergency)
-- aag / fire = fire (always emergency)
-- LESCO / IESCO / KESC / WAPDA = electricity providers (context determines urgency)
-- pani nahi = no water (community unless flood-related)
+Pakistani context: bijli/LESCO/IESCO/WAPDA = power, chori/daaka = security,
+sadak/pani = infrastructure/water, Roman Urdu is common (e.g. "bijli gayi").
 
-The post's declared category is provided as additional context. A post declared as
-"security" or "power" is more likely to be an emergency.
-
-Respond with ONLY a valid JSON object, no other text:
-{
-  "ai_classification": "emergency" | "community" | "general",
-  "is_emergency": true | false,
-  "language_detected": "en" | "ur" | "mixed",
-  "confidence": 0.0 to 1.0,
-  "civic_signal": "Brief 1-sentence structured description for the civic dashboard (e.g., '3-hour power outage in G-11 sector, 14 reports, resolved')"
-}
-
-"is_emergency" must be true if and only if ai_classification is "emergency".
-"civic_signal" should be a concise, structured summary useful for aggregation.
-"""
+Return exactly:
+{"ai_classification": "power|security|infrastructure|water|general",
+  "is_emergency": true|false,
+  "language_detected": "en|ur|mixed",
+  "confidence": 0.0,
+  "civic_signal": "one sentence"}"""
 
 
 async def classify_post(content: str, category: str) -> dict:
-    """Classify a post using the Anthropic Claude API.
-
-    Returns a dict with ``ai_classification``, ``is_emergency``,
-    ``language_detected``, ``confidence``, and ``civic_signal``.
-
-    Never raises — returns a safe fallback on any API error.
     """
-    import anthropic
-    from app.core.config import get_settings
+    Classify a neighborhood post using Gemma 4 31B via Gemini API.
+    Accepts ``content`` (the post body) and ``category`` (user-declared category).
+    Returns classification dict. Never raises — always returns a safe fallback.
+    Retries up to 3 times on transient 5xx server errors with exponential backoff.
+    """
+    fallback = {
+        "ai_classification": "general",
+        "is_emergency": False,
+        "language_detected": "mixed",
+        "confidence": 0.0,
+        "civic_signal": ""
+    }
 
-    settings = get_settings()
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    MAX_RETRIES = 3
+    client = genai.Client(api_key=get_settings().gemini_api_key)
+    prompt = CLASSIFICATION_PROMPT.replace("{body}", content)
 
-    user_message = f"Post category declared by author: {category}\n\nPost content:\n{content}"
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.models.generate_content,
+                    model="gemma-4-31b-it",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.1,
+                        max_output_tokens=200,
+                    )
+                ),
+                timeout=30.0
+            )
 
-    try:
-        response = await asyncio.wait_for(
-            client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=250,
-                system=CLASSIFICATION_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
-            ),
-            timeout=30.0,
-        )
-        raw = response.content[0].text
-        result = json.loads(raw)
-        # Validate required fields
-        assert result["ai_classification"] in ("emergency", "community", "general")
-        assert isinstance(result["is_emergency"], bool)
-        assert result["language_detected"] in ("en", "ur", "mixed")
-        return {
-            "ai_classification": result["ai_classification"],
-            "is_emergency": result["is_emergency"],
-            "language_detected": result["language_detected"],
-            "confidence": result.get("confidence", 0.0),
-            "civic_signal": result.get("civic_signal", ""),
-        }
-    except Exception as e:
-        logger.error(f"Classification failed: {e}")
-        return {
-            "ai_classification": "general",
-            "is_emergency": False,
-            "language_detected": "mixed",
-            "confidence": 0.0,
-            "civic_signal": "",
-        }
+            if not response or not response.text:
+                logger.warning("Gemini returned empty response for post: %.50s", content)
+                return fallback
+
+            text = response.text.strip()
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+            text = text.strip()
+
+            result = json.loads(text)
+
+            # Validate required fields
+            assert result.get("ai_classification") in [
+                "power", "security", "infrastructure", "water", "general"
+            ]
+            assert isinstance(result.get("is_emergency"), bool)
+            assert result.get("language_detected") in ["en", "ur", "mixed"]
+
+            return result
+
+        except asyncio.TimeoutError:
+            logger.warning("Gemini classification timed out for post: %.50s", content)
+            return fallback
+
+        except Exception:
+            if attempt < MAX_RETRIES - 1:
+                wait = 2 ** attempt  # exponential backoff: 1, 2, 4 seconds
+                logger.warning(
+                    "Gemini classification attempt %d/%d failed for post: %.50s, "
+                    "retrying in %ds...",
+                    attempt + 1, MAX_RETRIES, content, wait
+                )
+                await asyncio.sleep(wait)
+                continue
+            logger.exception(
+                "Gemini classification failed after %d attempts for post: %.50s",
+                MAX_RETRIES, content
+            )
+            return fallback
+
+    return fallback

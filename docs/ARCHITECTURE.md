@@ -43,8 +43,8 @@ Halqa is a three-tier web application deployed across three managed services:
          │
          ▼
 ┌──────────────────┐
-│  Anthropic API   │
-│  (claude-sonnet) │
+│  Gemini API     │
+│  (gemma-4-31b-it) │
 │  - Classification│
 │  - OCR on docs   │
 └──────────────────┘
@@ -61,7 +61,7 @@ Halqa is a three-tier web application deployed across three managed services:
 - Supabase Realtime subscriptions go **directly** from browser to Supabase.
   FastAPI does not mediate Realtime — it writes to the database, and Supabase
   broadcasts the change automatically.
-- The Anthropic API is called **only from FastAPI**. The API key is never
+- The Gemini API is called **only from FastAPI**. The API key is never
   exposed to the frontend or to Supabase Edge Functions.
 
 ---
@@ -976,7 +976,7 @@ Remove push subscription.
 ### 6.1 Overview
 
 The AI classification layer runs as a FastAPI background task immediately
-after a post is created. It calls the Anthropic Claude API, classifies the
+after a post is created. It calls the Google Gemini API, classifies the
 post, and updates the post record. If the post is classified as an emergency,
 it also triggers push notifications to all Tier 2+ neighborhood members.
 
@@ -1027,18 +1027,14 @@ Classify this post. Respond with:
 async def classify_post(post_id: UUID, content: str, category: str,
                          recent_emergency_count: int) -> ClassificationResult:
 
-    response = await anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=200,
-        system=CLASSIFICATION_SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": CLASSIFICATION_USER_PROMPT.format(
-                category=category,
-                content=content,
-                recent_emergency_count=recent_emergency_count
-            )
-        }]
+    response = await asyncio.to_thread(
+        client.models.generate_content,
+        model="gemma-4-31b-it",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+            max_output_tokens=200,
+        ),
     )
 
     result = json.loads(response.content[0].text)
@@ -1283,8 +1279,8 @@ SUPABASE_URL=https://{ref}.supabase.co
 SUPABASE_SERVICE_ROLE_KEY={service_role_key}       # Never exposed to frontend
 SUPABASE_JWT_SECRET={jwt_secret}                   # For JWT validation
 
-# Anthropic
-ANTHROPIC_API_KEY={api_key}
+# Gemini
+GEMINI_API_KEY={api_key}
 
 # Web Push (VAPID)
 VAPID_PUBLIC_KEY={vapid_public_key}
@@ -1306,7 +1302,7 @@ ALLOWED_ORIGINS=https://halqa.pk,https://www.halqa.pk
 |---|---|---|---|
 | `SUPABASE_URL` | Local Supabase instance | Staging Supabase project | Prod Supabase project |
 | `SUPABASE_SERVICE_ROLE_KEY` | Local key | Staging key | Prod key |
-| `ANTHROPIC_API_KEY` | Same key, dev model | Same key | Same key |
+| `GEMINI_API_KEY` | Same key, dev model | Same key | Same key |
 | `NEXT_PUBLIC_API_URL` | localhost:8000 | staging API URL | api.halqa.pk |
 | `ENVIRONMENT` | development | staging | production |
 
@@ -1380,7 +1376,7 @@ halqa/
 - **Render logs:** FastAPI stdout/stderr, accessible via Render dashboard
 - **Vercel logs:** Next.js serverless function logs, accessible via Vercel dashboard
 - **Supabase logs:** Database query logs, auth events, accessible via Supabase dashboard
-- **Anthropic API:** Token usage monitored via Anthropic console to avoid
+- **Gemini API:** Token usage monitored via Google AI Studio console to avoid
   unexpected spend during the demo period
 
 No APM, error tracking, or alerting beyond the above for the prototype.

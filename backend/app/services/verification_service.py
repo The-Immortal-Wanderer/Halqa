@@ -174,7 +174,7 @@ async def _run_ocr_and_decide(
     if confidence >= 0.75:
         await verification_repo.set_approved(
             tdb, record_id,
-            extracted_address=result.get("address_found"),
+            extracted_address=result.get("extracted_address"),
             ocr_confidence=confidence,
         )
         logger.info("Verification %s auto-approved (confidence=%.2f)", record_id, confidence)

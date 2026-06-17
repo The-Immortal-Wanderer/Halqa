@@ -284,7 +284,7 @@ VERIFICATION_REQUIRED. Do not allow self-upgrade without an approved record.
 as a stub from the scaffold. Implement it fully:
 - Generate a signed URL for the uploaded file from Supabase Storage
   (valid for 5 minutes — enough for the OCR call)
-- Send the image/PDF to the Anthropic API as a vision request with the
+- Send the image/PDF to the Gemini API as a vision request with the
   prompt: "Extract the address from this document. Return only the
   address text, nothing else. If no address is found, return empty string."
 - Compare extracted address to declared_address using simple normalized
@@ -292,9 +292,9 @@ as a stub from the scaffold. Implement it fully:
   words appear in extracted text)
 - Return: {extracted_address: str, confidence: float}
 
-For PDF files: convert first page to image before sending to Anthropic.
+For PDF files: convert first page to image before sending to Gemini.
 Use pdf2image (requires poppler). If pdf2image is not available,
-fall back to sending the raw PDF bytes — Anthropic's API accepts PDF
+fall back to sending the raw PDF bytes — Gemini's API accepts PDF
 documents natively.
 
 ---

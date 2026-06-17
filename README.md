@@ -14,7 +14,7 @@ Built for the **AI for Civic Innovation Hackathon 2026**.
 | Frontend | Next.js 14+ (App Router), TypeScript strict, Tailwind CSS |
 | Backend | Python 3.11+, FastAPI, async throughout |
 | Database | Supabase (PostgreSQL), Supabase Auth, Supabase Storage, Supabase Realtime |
-| AI Layer | Anthropic Claude API (claude-sonnet-4-20250514) via FastAPI |
+| AI Layer | Google Gemini API (Gemma 4 31B) via FastAPI |
 | Frontend Hosting | Vercel |
 | Backend Hosting | Render |
 | Icons | @phosphor-icons/react |
@@ -63,7 +63,7 @@ python -m venv venv
 # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your Supabase and Anthropic credentials
+# Edit .env with your Supabase and Gemini credentials
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -83,7 +83,7 @@ curl http://localhost:8000/health
 | `SUPABASE_URL` | Supabase project → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API (service role, keep secret) |
 | `SUPABASE_ANON_KEY` | Supabase project → Settings → API (anon/publishable key) |
-| `ANTHROPIC_API_KEY` | Anthropic Console → API Keys |
+| `GEMINI_API_KEY` | Google AI Studio → API Keys |
 | `VAPID_PUBLIC_KEY` | Generated VAPID key pair |
 | `VAPID_PRIVATE_KEY` | Generated VAPID key pair |
 | `VAPID_EMAIL` | Your contact email for VAPID |

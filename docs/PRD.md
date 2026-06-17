@@ -212,7 +212,7 @@ Features required to demonstrate this journey:
 
 **AI Alert Classification**
 - Every new post sent to the FastAPI AI service after creation
-- Claude classifies into: Emergency / Community / General
+- Gemini classifies into: power / security / infrastructure / water / general
 - Emergency posts pinned to top of feed and trigger push notification
 - Classification result stored on the post record
 - Misclassification correction available to anchor (manual override)
@@ -500,14 +500,14 @@ the team must be notified before continuing.
 1. Supabase Realtime is sufficient for feed update latency requirements
    in a prototype with seeded demo data (no load testing required for
    hackathon demo).
-2. The Anthropic Claude API (claude-sonnet-4-20250514) is sufficient for
+2. The Google Gemini API (Gemma 4 31B) is sufficient for
    alert classification with a well-designed prompt. No fine-tuned model
    is required for the prototype.
 3. Push notifications can be implemented via Supabase Edge Functions +
    Web Push API for the PWA at prototype stage without a dedicated
    notification service.
-4. OCR on verification documents uses Claude's vision capability via the
-   Anthropic API — no separate OCR library required for the prototype.
+4. OCR on verification documents uses Gemini's vision capability via the
+Gemini API — no separate OCR library required for the prototype.
 5. A seeded demo neighborhood with plausible Pakistani context is
    sufficient to demonstrate the civic dashboard in the hackathon demo.
    Real resident data is not required.

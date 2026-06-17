@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     supabase_anon_key: str
     supabase_service_role_key: str
 
-    # Anthropic
-    anthropic_api_key: str
+    # Gemini AI
+    gemini_api_key: str
 
     # Web Push (VAPID)
     vapid_public_key: str
